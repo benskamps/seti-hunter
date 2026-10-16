@@ -21,7 +21,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from targets_catalog import STAGE1_CADENCES, STAGE2_FINE_RES_QUEUE
-from weirdness_engine import assess_cadence, run_synthetic_verification_benchmark
+from weirdness_engine import OFF_DETECTION_SNR, assess_cadence, run_synthetic_verification_benchmark
 
 STAGING_RAW_DIR = r"E:\seti_staging\raw"
 RESULTS_DIR = r"E:\seti_staging\results"
@@ -125,7 +125,7 @@ def render_candidate_plot(
     )
     ax2.set_title(
         f"OFF-TARGET VETO (single OFF scan)\nON/OFF Ratio: {cand['on_off_ratio']:.2f}x | OFF SNR: {cand['off_peak_snr']:.1f}",
-        color="#f43f5e" if cand["on_off_ratio"] < 1.8 else "#34d399",
+        color="#f43f5e" if cand["off_peak_snr"] > OFF_DETECTION_SNR else "#34d399",
         fontsize=10,
         fontweight="bold",
     )
@@ -189,7 +189,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
 
     cards_html = []
     for rank, cand in enumerate(all_cands, 1):
-        is_sky = cand["on_off_ratio"] >= 1.8 or cand["off_peak_snr"] < 6.5
+        is_sky = cand["off_peak_snr"] <= OFF_DETECTION_SNR
         badge_color = "#10b981" if is_sky else "#f43f5e"
         badge_text = "SKY-LOCALIZED (ON-EXCLUSIVE)" if is_sky else "RFI / OFF-PRESENT"
         cards_html.append(f"""

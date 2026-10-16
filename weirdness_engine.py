@@ -325,7 +325,7 @@ def standardize_metric(arr: np.ndarray) -> np.ndarray:
 
 def classify_anomaly_type(row: dict) -> str:
     """Assigns a human-readable morphological taxonomy label to a detected anomaly."""
-    if row["on_off_ratio"] < 1.8 and row["off_peak_snr"] > 6.5:
+    if row["off_peak_snr"] > OFF_DETECTION_SNR:
         return "Terrestrial / Satellite RFI (Present in OFF)"
     if abs(row["drift_bins"]) >= 2 and row["drift_snr"] > row["static_snr"] * 1.05:
         return f"Drifting Narrowband Technosignature Candidate ({row['drift_rate_hz_s']:+.2f} Hz/s)"
@@ -336,6 +336,22 @@ def classify_anomaly_type(row: dict) -> str:
     if row["active_chans_count"] >= 3 and row["z_morphology"] > 5.0:
         return "Structured Multi-Carrier / Sideband Complex"
     return "Narrowband Sky-Localized Anomaly"
+
+
+OFF_DETECTION_SNR = 8.0
+
+
+def onoff_veto_multiplier(off_peak_snr: np.ndarray, on_off_ratio: np.ndarray) -> np.ndarray:
+    """
+    Anything detected in the OFF scan is not sky-localized, however much louder it is
+    in ON (RFI strength changes between scans), so it gets the strong 0.15 suppression.
+    Only tiles quiet in OFF earn the sqrt(ON/OFF) boost.
+    """
+    return np.where(
+        off_peak_snr > OFF_DETECTION_SNR,
+        0.15,
+        np.clip(np.sqrt(on_off_ratio), 0.5, 4.0),
+    )
 
 
 def assess_cadence(
@@ -400,12 +416,8 @@ def assess_cadence(
         + 0.15 * z_manifold
     )
 
-    # Sky-Localized Weirdness Score (penalizes tiles that are equally loud in OFF-target scan)
-    abacad_veto_multiplier = np.where(
-        (off_peak_snr > 8.0) & (on_off_ratio < 1.6),
-        0.15,  # Strong suppression for persistent terrestrial RFI
-        np.clip(np.sqrt(on_off_ratio), 0.5, 4.0),
-    )
+    # Sky-Localized Weirdness Score (penalizes tiles with signal in the OFF-target scan)
+    abacad_veto_multiplier = onoff_veto_multiplier(off_peak_snr, on_off_ratio)
 
     total_weirdness_score = intrinsic_weirdness * abacad_veto_multiplier
 
@@ -486,8 +498,8 @@ def assess_cadence(
         "throughput_mchans_s": round((usable_chans * T) / max(elapsed * 1e6, 1e-6), 2),
         "max_weirdness_score": round(float(np.max(total_weirdness_score)), 2),
         "median_weirdness_score": round(float(np.median(total_weirdness_score)), 2),
-        "rfi_vetoed_tiles": int(np.sum((off_peak_snr > 8.0) & (on_off_ratio < 1.6))),
-        "sky_localized_tiles_gt_15": int(np.sum((total_weirdness_score > 15.0) & (on_off_ratio >= 1.8))),
+        "rfi_vetoed_tiles": int(np.sum(off_peak_snr > OFF_DETECTION_SNR)),
+        "sky_localized_tiles_gt_15": int(np.sum((total_weirdness_score > 15.0) & (off_peak_snr <= OFF_DETECTION_SNR))),
         "candidates": candidates,
     }
     return summary
@@ -537,6 +549,11 @@ def run_synthetic_verification_benchmark() -> dict:
     on_data[:, 210 * W + 128] += 14.0
     off_data[:, 210 * W + 128] += 14.5
 
+    # 6. Tile 230: RFI clearly present in OFF but ~3x louder in ON (e.g. a sidelobe
+    #    pickup that changed between scans). Still not sky-localized, so it must be vetoed.
+    on_data[:, 230 * W + 64] += 40.0
+    off_data[:, 230 * W + 64] += 14.0
+
     hdr = {
         "source_name": "SYNTHETIC_BENCHMARK",
         "fch1_mhz": 1420.0,
@@ -573,26 +590,25 @@ def run_synthetic_verification_benchmark() -> dict:
         + 0.15 * z_morphology
         + 0.15 * z_manifold
     )
-    abacad_veto_multiplier = np.where(
-        (off_peak_snr > 8.0) & (on_off_ratio < 1.6),
-        0.15,
-        np.clip(np.sqrt(on_off_ratio), 0.5, 4.0),
-    )
+    abacad_veto_multiplier = onoff_veto_multiplier(off_peak_snr, on_off_ratio)
     total_weirdness_score = intrinsic_weirdness * abacad_veto_multiplier
 
     top_tiles = [int(x) for x in np.argsort(total_weirdness_score)[::-1][:6]]
     expected_on_tiles = {42, 95, 140, 190}
     recovered = expected_on_tiles.intersection(set(top_tiles[:5]))
     rfi_vetoed = 210 not in top_tiles[:4]
+    loud_on_rfi_vetoed = 230 not in top_tiles[:4]
 
     return {
-        "passed": (len(recovered) == 4) and rfi_vetoed,
+        "passed": (len(recovered) == 4) and rfi_vetoed and loud_on_rfi_vetoed,
         "top_6_tiles": top_tiles,
         "recovered_on_targets": sorted(list(recovered)),
         "rfi_tile_210_score": round(float(total_weirdness_score[210]), 2),
         "rfi_tile_210_intrinsic": round(float(intrinsic_weirdness[210]), 2),
+        "rfi_tile_230_score": round(float(total_weirdness_score[230]), 2),
+        "rfi_tile_230_intrinsic": round(float(intrinsic_weirdness[230]), 2),
         "scores_by_injected_tile": {
-            t: round(float(total_weirdness_score[t]), 2) for t in [42, 95, 140, 190, 210]
+            t: round(float(total_weirdness_score[t]), 2) for t in [42, 95, 140, 190, 210, 230]
         },
     }
 

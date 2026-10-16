@@ -29,6 +29,7 @@ from weirdness_engine import (
     compute_dedoppler_snr,
     standardize_metric,
     classify_anomaly_type,
+    onoff_veto_multiplier,
 )
 from run_survey import (
     STAGING_RAW_DIR,
@@ -194,11 +195,7 @@ def grind_fine_cadence(
                 + 0.15 * z_morphology
                 + 0.15 * z_manifold
             )
-            veto_mult = np.where(
-                (off_peak_snr > 8.0) & (on_off_ratio < 1.6),
-                0.15,
-                np.clip(np.sqrt(on_off_ratio), 0.5, 4.0),
-            )
+            veto_mult = onoff_veto_multiplier(off_peak_snr, on_off_ratio)
             total_weirdness = intrinsic * veto_mult
 
             # Keep top 2 tiles per slab
