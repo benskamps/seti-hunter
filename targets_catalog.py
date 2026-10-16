@@ -132,9 +132,11 @@ STAGE1_CADENCES = [
     },
     {
         "cadence_id": "nearby_exoplanet_hosts",
-        "name": "Epsilon Eridani (GJ 144) & Luyten's Star (HIP 36208)",
-        "category": "Solar Neighborhood Exoplanet Hosts (<13 ly)",
-        "description": "Epsilon Eridani (10.5 ly, closest young solar analog with planet & debris belt) paired against Luyten's Star (12.3 ly, habitable-zone super-Earth GJ 273b & target of Sónar Active SETI transmission) at identical GBT S-band frequency (2300.39 MHz) for cross-sky RFI veto.",
+        "name": "Epsilon Eridani (GJ 144) vs. LHS 292 (OFF)",
+        "category": "Solar Neighborhood Exoplanet Host (10.5 ly)",
+        "description": "Epsilon Eridani (10.5 ly, closest young solar analog with planet & debris belt) scored against an OFF scan of LHS 292 (nearby M-dwarf flare star) on the GBT S-band receiver. Caveat: the ON scan (MJD 57635, AGBT16B) and OFF scan (MJD 57842, AGBT17A) are ~207 days apart, so this is a cross-epoch pair, not a cadence; RFI present in only one epoch survives the veto.",
+        # run_survey.py scores on_files[0] vs off_files[0] only; the Luyten's Star
+        # scan below is listed but never downloaded or scored.
         "on_files": [
             {
                 "label": "Epsilon Eridani (Scan 0003)",
@@ -159,7 +161,7 @@ STAGE1_CADENCES = [
         "cadence_id": "kepler_transit_pair",
         "name": "Kepler-992b & Kepler-738b (L-Band Water Hole 1.475 GHz)",
         "category": "Kepler Transiting Exoplanets (Water Hole Band)",
-        "description": "L-band observations centered at 1475 MHz right inside the 'Water Hole' (between the 1420 MHz H I neutral hydrogen line and 1665 MHz OH hydroxyl lines). Alternating ABACAD cadence between Kepler-992b and Kepler-738b.",
+        "description": "L-band observations centered at 1475 MHz right inside the 'Water Hole' (between the 1420 MHz H I neutral hydrogen line and 1665 MHz OH hydroxyl lines). Scored as a single ON/OFF pair: Kepler-992b scan 0010 vs. Kepler-738b scan 0011 (the second Kepler-992b scan is not used).",
         "on_files": [
             {
                 "label": "Kepler-992b (Scan 0010)",

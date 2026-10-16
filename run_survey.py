@@ -2,7 +2,7 @@
 SETI Rolling-Buffer Survey & Observatory Dashboard Generator
 ============================================================
 Streams Breakthrough Listen cadences to E:\\seti_staging\\raw, runs the 5-axis
-Weirdness & ABACAD Veto Engine across millions of channels, renders side-by-side
+Weirdness & ON/OFF Veto Engine across millions of channels, renders side-by-side
 ON vs OFF waterfall spectrograms, purges the raw multi-hundred-MB/GB files to
 keep disk footprint near zero, and builds an interactive HTML dashboard.
 """
@@ -124,7 +124,7 @@ def render_candidate_plot(
         vmax=vmax,
     )
     ax2.set_title(
-        f"OFF-TARGET VETO (ABACAD Ref)\nON/OFF Ratio: {cand['on_off_ratio']:.2f}x | OFF SNR: {cand['off_peak_snr']:.1f}",
+        f"OFF-TARGET VETO (single OFF scan)\nON/OFF Ratio: {cand['on_off_ratio']:.2f}x | OFF SNR: {cand['off_peak_snr']:.1f}",
         color="#f43f5e" if cand["on_off_ratio"] < 1.8 else "#34d399",
         fontsize=10,
         fontweight="bold",
@@ -357,7 +357,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
 <body>
     <h1>SETI Weirdness & Technosignature Observatory</h1>
     <div class="subtitle">
-        Breakthrough Listen Open Data Archive &bull; 5-Axis Unsupervised Anomaly Scorer + ABACAD Sky-Localization Veto &bull; Rolling Staging Buffer on <code>E:\\seti_staging</code>
+        Breakthrough Listen Open Data Archive &bull; 5-Axis Unsupervised Anomaly Scorer + ON/OFF Sky-Localization Veto (one OFF scan per target) &bull; Rolling Staging Buffer on <code>E:\\seti_staging</code>
     </div>
 
     <div class="kpi-grid">
@@ -455,7 +455,7 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
                 downloaded_files.append(off_path)
 
             raw_mb = sum(os.path.getsize(p) for p in downloaded_files if os.path.exists(p)) / (1024 * 1024)
-            print(f"  [ASSESSING] Running 5-Axis Weirdness + ABACAD Veto on {name} ...")
+            print(f"  [ASSESSING] Running 5-Axis Weirdness + ON/OFF Veto on {name} ...")
             summary = assess_cadence(on_path, off_path, tile_width=256, top_k=top_k_per_cadence)
             summary["cadence_id"] = cid
             summary["target_name"] = name

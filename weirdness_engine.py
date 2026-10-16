@@ -2,15 +2,15 @@
 SETI Weirdness & Anomaly Assessment Engine
 ==========================================
 Evaluates radio astronomy filterbank (.fil) and HDF5 (.h5) spectrograms across
-five orthogonal axes of 'weirdness', coupled with an ON-target vs OFF-target (ABACAD)
-sky-localization veto:
+five orthogonal axes of 'weirdness', coupled with an ON-target vs OFF-target
+sky-localization veto (one ON scan vs one OFF scan, not a full ABACAD cadence):
 
 1. Narrowband De-Doppler Drift SNR (linear drifting carriers)
 2. Temporal Kurtosis & Pulsed Duty-Cycle Anomaly (blinking beacons / fast bursts)
 3. Non-Linear Ridge Curvature / Acceleration (chirps, curved orbits, frequency-hopping)
 4. 2D Time-Frequency Morphological Structure (SVD low-rank structure / modulated sidebands)
 5. Unsupervised Manifold Outlier Distance (Isolation Forest + PCA reconstruction error)
-6. ABACAD Sky-Localization Veto (ON-target power vs OFF-target reference power in the exact MHz window)
+6. ON/OFF Sky-Localization Veto (ON-target power vs OFF-target reference power in the exact MHz window)
 """
 
 import os
@@ -346,7 +346,7 @@ def assess_cadence(
 ) -> dict:
     """
     Runs the full 5-axis SETI Weirdness Assessment on an ON-target file and
-    performs cross-scan ABACAD sky-localization veto against an OFF-target file.
+    performs an ON/OFF sky-localization veto against a single OFF-target file.
     """
     t0 = time.time()
     on_raw, on_freqs, on_hdr = load_spectrogram_fast(on_filepath)

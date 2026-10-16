@@ -8,7 +8,7 @@ array into RAM.
 Architecture:
 1. Streams ON-target and OFF-target files to E:\\seti_staging\\raw.
 2. Uses blimpy / h5py hyperslab slicing to read 1,048,576 channels (4,096 tiles of 256 bins) at a time.
-3. Scores every 256-channel tile across all 5 Weirdness axes + ABACAD ON/OFF veto.
+3. Scores every 256-channel tile across all 5 Weirdness axes + single-pair ON/OFF veto.
 4. Maintains a bounded min-heap of the top N weirdest sky-localized anomalies across the entire 15 GB scan.
 5. Renders high-resolution waterfall cutouts and immediately purges the multi-GB raw files from E:\\.
 """
