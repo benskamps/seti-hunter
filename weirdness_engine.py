@@ -140,7 +140,9 @@ def normalize_bandpass(data: np.ndarray, tile_width: int = 256) -> np.ndarray:
     return z_tiles.reshape(n_time, usable), usable
 
 
-def compute_dedoppler_snr(z_tiles: np.ndarray, max_shift_bins: int = 12) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def compute_dedoppler_snr(
+    z_tiles: np.ndarray, max_shift_bins: int = 12, calibrate: bool = True
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Vectorized De-Doppler shift-and-stack across all tiles simultaneously.
     Input:
@@ -149,6 +151,11 @@ def compute_dedoppler_snr(z_tiles: np.ndarray, max_shift_bins: int = 12) -> tupl
         best_snr: (N_tiles,) peak integrated SNR across all drift rates and channels
         best_drift_bins: (N_tiles,) total frequency bin shift from t=0 to t=T-1
         best_chan_in_tile: (N_tiles,) starting channel index inside tile
+
+    calibrate=True measures SNR against the empirical spread of the other drift tracks in
+    the same tile at the same drift rate (median and 1.4826*MAD over the tile's channels).
+    calibrate=False is the old white-noise assumption, track sum / sqrt(T), which is 2-4x
+    too optimistic when channels carry slow, channel-to-channel structure (TRAPPIST-1).
     """
     T, N_tiles, W = z_tiles.shape
     sqrt_T = math.sqrt(max(T, 1))
@@ -175,7 +182,13 @@ def compute_dedoppler_snr(z_tiles: np.ndarray, max_shift_bins: int = 12) -> tupl
         snr_profile = acc / sqrt_T
         # Avoid edge wrap artifacts
         pad = abs(total_shift) + 1
-        if pad < W // 2:
+        edges = pad < W // 2
+        if calibrate:
+            interior = snr_profile[:, pad:-pad] if edges else snr_profile
+            med = np.median(interior, axis=1, keepdims=True)
+            mad = np.median(np.abs(interior - med), axis=1, keepdims=True)
+            snr_profile = (snr_profile - med) / np.maximum(1.4826 * mad, 1e-6)
+        if edges:
             snr_profile[:, :pad] = 0.0
             snr_profile[:, -pad:] = 0.0
 
@@ -644,6 +657,45 @@ def run_synthetic_verification_benchmark() -> dict:
     }
 
 
+def run_noise_calibration_benchmark(calibrate: bool = True) -> dict:
+    """
+    Self-test of the de-Doppler SNR calibration. Two signal-free scans (16 x 65,536 channels):
+    white noise, and white noise plus a constant per-channel offset (sigma 0.6) that the
+    33-channel bandpass median filter cannot remove, which is what TRAPPIST-1's scans look
+    like (nearby-track spread 2-4x the white-noise value). In both, fewer than 0.5% of tiles
+    may exceed the OFF_DETECTION_SNR "present" bar. A carrier injected into the structured
+    scan (tile 77, +4 bins drift) must still be the top tile at SNR >= 10.
+    calibrate=False (the old white-noise SNR) must FAIL the structured-noise case.
+    """
+    rng = np.random.default_rng(20261017)
+    T, N, W = 16, 65536, 256
+    white = rng.normal(100.0, 1.0, size=(T, N)).astype(np.float32)
+    structured = white + rng.normal(0.0, 0.6, size=N).astype(np.float32)[None, :]
+    with_signal = structured.copy()
+    for t in range(T):
+        with_signal[t, 77 * W + 100 + int(round(4.0 * t / (T - 1)))] += 8.0
+
+    def best_snr(data):
+        z, _ = normalize_bandpass(data, tile_width=W)
+        snr, _, _ = compute_dedoppler_snr(z.reshape(T, N // W, W), max_shift_bins=10, calibrate=calibrate)
+        return snr
+
+    white_snr, struct_snr, sig_snr = best_snr(white), best_snr(structured), best_snr(with_signal)
+    fa_white = float(np.mean(white_snr > OFF_DETECTION_SNR))
+    fa_struct = float(np.mean(struct_snr > OFF_DETECTION_SNR))
+    top = int(np.argmax(sig_snr))
+    return {
+        "passed": fa_white < 0.005 and fa_struct < 0.005 and top == 77 and float(sig_snr[77]) >= 10.0,
+        "calibrate": calibrate,
+        "white_false_alarm_frac": round(fa_white, 4),
+        "structured_false_alarm_frac": round(fa_struct, 4),
+        "white_median_best_snr": round(float(np.median(white_snr)), 2),
+        "structured_median_best_snr": round(float(np.median(struct_snr)), 2),
+        "injected_tile_77_snr": round(float(sig_snr[77]), 2),
+        "top_tile_with_signal": top,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Full-cadence test (ON/OFF/ON/OFF[/ON/OFF]) for Stage 1 candidates
 # ---------------------------------------------------------------------------
@@ -698,8 +750,9 @@ def drift_aligned_snr(
     med = float(np.median(bg))
     sigma = max(1.4826 * float(np.median(np.abs(bg - med))), 1e-6)
     k = int(np.argmax(np.where(win, dd, -np.inf)))
-    # raw_snr is on Stage 1's scale (track sum / sqrt(T), assumes white noise). snr uses the
-    # measured spread of nearby tracks, which on some scans (TRAPPIST-1) is 2-4x wider.
+    # raw_snr is the white-noise value (track sum / sqrt(T)). snr uses the measured spread of
+    # nearby tracks, which on some scans (TRAPPIST-1) is 2-4x wider; Stage 1 is calibrated
+    # the same way (compute_dedoppler_snr), but over the tile's own 256 channels.
     return {"snr": (float(dd[k]) - med) / sigma, "raw_snr": float(dd[k]), "offset_ch": int(offs[k]),
             "search_chans": int(search_chans)}
 
@@ -858,4 +911,5 @@ def run_synthetic_cadence_benchmark(method: str = "dedoppler", scans_used: int |
 if __name__ == "__main__":
     res = run_synthetic_verification_benchmark()
     print(json.dumps(res, indent=2))
+    print(json.dumps(run_noise_calibration_benchmark(), indent=2))
     print(json.dumps(run_synthetic_cadence_benchmark(), indent=2))

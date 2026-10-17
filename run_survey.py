@@ -28,6 +28,7 @@ from weirdness_engine import (
     CADENCE_PRESENT_SNR,
     OFF_DETECTION_SNR,
     assess_cadence,
+    run_noise_calibration_benchmark,
     run_synthetic_cadence_benchmark,
     run_synthetic_verification_benchmark,
 )
@@ -443,7 +444,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
         <div class="kpi">
             <div class="kpi-label">Synthetic Ground-Truth Check</div>
             <div class="kpi-val" style="color:{'#34d399' if bench['passed'] else '#f43f5e'}">
-                {'PASS (4/4 + RFI Veto)' if bench['passed'] else 'FAIL'}
+                {'PASS (4/4 + RFI Veto + Noise Cal.)' if bench['passed'] else 'FAIL'}
             </div>
         </div>
         <div class="kpi">
@@ -513,6 +514,12 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
     print("=================================================================")
     bench = run_synthetic_verification_benchmark()
     print(f"  Benchmark Passed: {bench['passed']} | Recovered Tiles: {bench['recovered_on_targets']} | RFI Tile 210 Vetoed Score: {bench['rfi_tile_210_score']}")
+    noise_bench = run_noise_calibration_benchmark()
+    print(f"  Noise Calibration Benchmark Passed: {noise_bench['passed']} | false alarms in structured noise: "
+          f"{noise_bench['structured_false_alarm_frac']:.2%} | injected carrier SNR {noise_bench['injected_tile_77_snr']}")
+    bench["noise_calibration"] = noise_bench
+    bench["passed_stage1_only"] = bench["passed"]
+    bench["passed"] = bench["passed"] and noise_bench["passed"]
     cadence_bench = run_synthetic_cadence_benchmark()
     print(f"  Cadence Benchmark Passed: {cadence_bench['passed']}")
     for chk_name, chk in cadence_bench["checks"].items():
