@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Heat Audit</title>
+<!-- CONSUMER: Ben, one read, to decide whether the Dyson-sphere companion goes ahead (§07).
+     SOURCE: docs/research/2026-10-17-dyson-sphere-search-plan.md (commit fe8f80c) — that file is canonical;
+     this page is a reading render of it and adds no claims. Static, zero JS. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f4ede4'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%238b3a1f'/%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%238b3a1f' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=JetBrains+Mono:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4ede4;
+    --paper-warm: #ebe2d4;
+    --ink: #1f1912;
+    --ink-soft: #5a4a39;
+    --rule: #d9cdb8;
+    --line: rgba(31,25,18,.16);
+    --line-strong: rgba(31,25,18,.4);
+    --rust: #8b3a1f;          /* the one load-bearing accent */
+    --rust-soft: #c97a4a;
+    --moss: #4f5f33;          /* semantic: held / feasible */
+    --clay: #a8522e;          /* semantic: eliminated / snag */
+    --gold: #9a7428;          /* semantic: empirical */
+    --slate: #4a5a66;         /* semantic: boundary / unverified */
+    --ash: #8a7f70;
+    --serif: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.58;
+    background-image:
+      radial-gradient(ellipse at top left, rgba(198,151,73,.09), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(139,58,31,.06), transparent 50%);
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.7;
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 2px, rgba(10,9,8,.012) 2px 3px),
+      repeating-linear-gradient(90deg, transparent 0 2px, rgba(10,9,8,.012) 2px 3px); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 64px 40px 100px; position: relative; z-index: 2; }
+  a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  em { font-style: italic; }
+  .mono, .label { font-family: var(--mono); }
+  code { font-family: var(--mono); font-size: .82em; color: var(--rust); background: rgba(139,58,31,.07); padding: 1px 5px; border-radius: 3px; }
+
+  /* masthead */
+  .masthead { border-top: 4px double var(--ink); border-bottom: 1px solid var(--ink); padding: 22px 0 16px;
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: end; margin-bottom: 56px; }
+  .mh-side { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); line-height: 1.7; }
+  .mh-side.r { text-align: right; }
+  .mh-title { font-weight: 800; font-style: italic; font-size: clamp(46px, 8vw, 88px); line-height: .88; letter-spacing: -.04em;
+    font-variation-settings: "opsz" 144; text-align: center; }
+  .mh-sub { grid-column: 1 / -1; text-align: center; font-family: var(--mono); font-size: 10px; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--rust); padding-top: 14px; border-top: 1px solid var(--line); }
+
+  /* hero */
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: var(--rust);
+    display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .eyebrow::before, .eyebrow::after { content:""; flex:1; height:1px; background: var(--line); }
+  .hero-q { font-weight: 300; font-style: italic; font-size: clamp(26px, 3.8vw, 40px); line-height: 1.22; letter-spacing: -.02em;
+    text-align: center; font-variation-settings: "opsz" 96; }
+  .hero-q em { color: var(--rust); }
+  .hero-a { text-align: center; font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft); margin-top: 22px; }
+
+  /* stat strip */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); margin: 52px 0 0; }
+  .stat { padding: 18px 16px 16px; border-right: 1px solid var(--line); position: relative; }
+  .stat:last-child { border-right: 0; }
+  .stat b { display: block; font-family: var(--mono); font-weight: 700; font-size: 28px; letter-spacing: -.02em; color: var(--rust); line-height: 1.1; }
+  .stat span { display: block; font-family: var(--mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft); margin-top: 6px; line-height: 1.5; }
+  .stat .chip { display: table; margin-bottom: 8px; }
+
+  /* chips — epistemic vocabulary */
+  .chip { display: inline-block; font-family: var(--mono); font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase;
+    border: 1px solid currentColor; padding: 1px 5px 0; border-radius: 3px; vertical-align: 2px; white-space: nowrap; font-style: normal; font-weight: 500; }
+  .c-probe { color: var(--moss); }
+  .c-comp { color: var(--gold); }
+  .c-unv { color: var(--slate); border-style: dashed; }
+  .c-elim { color: var(--clay); }
+  .c-held { color: var(--moss); }
+  .c-ash { color: var(--ash); border-style: dashed; }
+
+  /* sections */
+  .sec { margin: 84px 0 0; }
+  .sec-num { font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--rust); text-transform: uppercase; margin-bottom: 10px; }
+  .sec h2 { font-weight: 700; font-size: clamp(30px, 4.2vw, 46px); line-height: 1.02; letter-spacing: -.03em; font-variation-settings: "opsz" 144; }
+  .sec .blurb { font-style: italic; color: var(--ink-soft); font-size: 18px; margin: 8px 0 28px; max-width: 46em; }
+  .sec p + p { margin-top: 14px; }
+  h3 { font-style: italic; font-weight: 500; font-size: 22px; letter-spacing: -.01em; margin: 34px 0 10px; font-variation-settings: "opsz" 72; }
+
+  .dropcap::first-letter { float: left; font-size: 4.6em; line-height: .82; padding: 6px 10px 0 0; font-weight: 900; font-style: italic; color: var(--rust); font-variation-settings: "opsz" 144; }
+
+  /* verdict block */
+  .verdict { border-left: 3px solid var(--rust); background: rgba(255,255,255,.42); padding: 22px 26px; margin-top: 8px; }
+  .verdict p { margin: 0; }
+  .verdict .k { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--rust); display: block; margin-bottom: 4px; }
+  .verdict p + p { margin-top: 16px; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 15px; }
+  thead th { background: var(--ink); color: var(--paper); font-family: var(--mono); font-weight: 500; font-size: 9.5px; letter-spacing: .16em;
+    text-transform: uppercase; text-align: left; padding: 8px 10px; }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+  tbody tr:nth-child(even) td { background: rgba(235,226,212,.45); }
+  th.nt { text-transform: none; letter-spacing: .06em; }
+  td.n, th.n { font-family: var(--mono); font-size: 13px; text-align: right; white-space: nowrap; }
+  td .who { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--ink-soft); display: block; margin-top: 2px; text-transform: uppercase; }
+  .tblwrap { overflow-x: auto; }
+  .caption { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 8px; }
+
+  /* figure frame */
+  .fig { position: relative; border: 1px solid var(--line-strong); padding: 30px 24px 20px; margin: 34px 0 10px; background: rgba(255,255,255,.3); }
+  .fig > .fig-label { position: absolute; top: -9px; left: 20px; background: var(--paper); padding: 0 10px; font-family: var(--mono);
+    font-size: 10px; letter-spacing: .2em; color: var(--rust); text-transform: uppercase; }
+
+  /* log funnel bars */
+  .bars { display: grid; grid-template-columns: minmax(150px, 2.2fr) 6fr 72px; gap: 7px 14px; align-items: center; }
+  .bars .lbl { font-size: 14px; line-height: 1.3; }
+  .bars .track { height: 12px; background: var(--paper-warm); position: relative; }
+  .bars .fill { position: absolute; inset: 0 auto 0 0; background: var(--rust-soft); }
+  .bars .fill.hot { background: var(--rust); }
+  .bars .fill.cool { background: var(--slate); opacity: .65; }
+  .bars .num { font-family: var(--mono); font-size: 12.5px; text-align: right; }
+
+  /* candidate tiles */
+  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; }
+  .tile { border: 1px solid var(--line); border-top: 3px solid var(--ash); padding: 10px 10px 9px; background: rgba(255,255,255,.4); }
+  .tile b { font-family: var(--mono); font-size: 20px; font-weight: 600; display: block; line-height: 1; }
+  .tile span { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); display: block; margin-top: 7px; line-height: 1.45; }
+  .tile.elim { border-top-color: var(--clay); } .tile.elim b { color: var(--clay); }
+  .tile.strong { border-top-color: var(--rust-soft); }
+  .tile.weak { border-top-color: var(--gold); }
+  .tile.none { border-top-color: var(--ash); border-top-style: dashed; }
+
+  /* signature cards */
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .card { border-left: 3px solid var(--ash); background: rgba(255,255,255,.4); padding: 16px 18px 14px; transition: background .12s ease-out; }
+  .card:hover { background: rgba(255,255,255,.78); }
+  .card.primary { border-left-color: var(--rust); grid-column: 1 / -1; }
+  .card .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); display: flex; justify-content: space-between; gap: 8px; }
+  .card h4 { font-style: italic; font-weight: 500; font-size: 20px; margin: 4px 0 6px; font-variation-settings: "opsz" 48; }
+  .card p { font-size: 15.5px; }
+
+  /* ladder */
+  .ladder { list-style: none; border-left: 1px solid var(--ink); margin: 6px 0 0 18px; }
+  .ladder li { position: relative; padding: 4px 0 18px 30px; }
+  .ladder li::before { content: attr(data-r); position: absolute; left: -16px; top: 0; width: 31px; height: 31px; border-radius: 50%;
+    background: var(--paper); border: 1px solid var(--ink); font-family: var(--mono); font-size: 13px; text-align: center; line-height: 30px; }
+  .ladder li b { font-style: italic; font-weight: 600; }
+  .ladder li .src { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin-top: 3px; }
+  .ladder li.end::before { content: "★"; background: var(--rust); color: var(--paper); border-color: var(--rust); }
+
+  /* controls */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; }
+  .box { border: 1px solid var(--line); padding: 14px 16px; background: rgba(255,255,255,.35); }
+  .box .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--rust); display: block; margin-bottom: 6px; }
+  .box p, .box li { font-size: 15px; }
+  .box ul { padding-left: 18px; }
+
+  /* snags */
+  .moves { counter-reset: mv; list-style: none; }
+  .moves li { counter-increment: mv; display: grid; grid-template-columns: 56px 1fr; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .moves li::before { content: counter(mv, decimal-leading-zero); font-family: var(--mono); font-size: 30px; color: var(--rust); font-weight: 300; line-height: 1; }
+  .moves b { font-style: italic; font-weight: 600; }
+  .moves .fix { display: block; margin-top: 5px; font-size: 15.5px; color: var(--ink-soft); }
+  .moves .fix::before { content: "FIX — "; font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--moss); }
+
+  /* stamps */
+  .stamps { display: flex; flex-wrap: wrap; gap: 16px 22px; margin: 26px 0 6px; align-items: center; }
+  .stamp { display: inline-block; padding: 8px 18px; border: 3px double; border-radius: 4px; font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .26em; text-transform: uppercase; transform: rotate(-2deg); }
+  .stamp.feasible { color: var(--moss); border-color: var(--moss); font-size: 14px; padding: 10px 24px; transform: rotate(-3deg); }
+  .stamp.emp { color: var(--gold); border-color: var(--gold); }
+  .stamp.conj { color: var(--clay); border-color: var(--clay); transform: rotate(-4.5deg); }
+  .stamp.null { color: var(--slate); border-color: var(--slate); transform: rotate(1.5deg); }
+  .stamp-note { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); display: block; margin-top: 6px; transform: none; }
+  .stampcell { display: flex; flex-direction: column; align-items: flex-start; max-width: 200px; }
+
+  /* boundary */
+  .boundary { border-left: 3px solid var(--slate); padding: 14px 20px; background: rgba(74,90,102,.06); margin-top: 26px; }
+  .boundary .k { font-family: var(--mono); font-size: 10px; letter-spacing: .3em; color: var(--slate); text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .boundary p { font-size: 15.5px; }
+
+  /* decisions */
+  .decisions { list-style: none; counter-reset: d; }
+  .decisions li { counter-increment: d; position: relative; padding: 14px 0 14px 54px; border-bottom: 1px solid var(--line); }
+  .decisions li::before { content: "D" counter(d); position: absolute; left: 0; top: 14px; font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+    border: 1px solid var(--rust); color: var(--rust); padding: 2px 6px; border-radius: 3px; }
+  .decisions b { font-style: italic; font-weight: 600; }
+  .rec { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--paper); background: var(--rust); padding: 2px 6px; border-radius: 3px; margin-left: 4px; vertical-align: 2px; white-space: nowrap; }
+
+  /* milestone rail */
+  .rail { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
+  .seg { padding: 10px 8px 12px; border-top: 6px solid var(--rule); }
+  .seg.first { border-top-color: var(--rust); }
+  .seg.gated { border-top-color: var(--rule); border-top-style: dashed; }
+  .seg b { font-family: var(--mono); font-size: 13px; display: block; }
+  .seg span { font-size: 13.5px; line-height: 1.35; display: block; margin-top: 4px; }
+  .seg i { font-family: var(--mono); font-style: normal; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); display: block; margin-top: 6px; }
+
+  /* sources */
+  .sources { columns: 2; column-gap: 34px; font-size: 13.5px; line-height: 1.45; list-style: none; counter-reset: s; }
+  .sources li { counter-increment: s; break-inside: avoid; padding: 0 0 7px 30px; position: relative; }
+  .sources li::before { content: "[" counter(s) "]"; position: absolute; left: 0; font-family: var(--mono); font-size: 10.5px; color: var(--rust); top: 2px; }
+  .sources a { word-break: break-word; }
+
+  /* footer */
+  footer { margin-top: 90px; border-top: 1px solid var(--ink); border-bottom: 4px double var(--ink); padding: 18px 0 16px; }
+  .colophon { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); line-height: 1.7; }
+  .colophon b { color: var(--ink); font-weight: 500; display: block; letter-spacing: .2em; }
+  .signoff { text-align: center; font-style: italic; color: var(--ink-soft); font-size: 15px; margin-top: 18px; }
+  .endmark { text-align: center; color: var(--rust); font-size: 20px; margin-top: 6px; }
+
+  @media (max-width: 820px) {
+    .wrap { padding: 40px 18px 70px; }
+    .masthead { grid-template-columns: 1fr; text-align: center; }
+    .mh-side, .mh-side.r { text-align: center; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat:nth-child(2) { border-right: 0; }
+    .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .cards, .two { grid-template-columns: 1fr; }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .rail { grid-template-columns: 1fr 1fr; }
+    .bars { grid-template-columns: 1fr auto; grid-auto-flow: dense; row-gap: 4px; }
+    .bars .num { grid-column: 2; }
+    .bars .track { grid-column: 1 / -1; order: 0; }
+    .sources { columns: 1; }
+    .colophon { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: #fff; } body::before { display: none; }
+    .sec { break-inside: avoid-page; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="mh-side">seti-hunter · research<br>Plan only · nothing built</div>
+  <div class="mh-title">The Heat Audit</div>
+  <div class="mh-side r">Filed 17 Oct 2026<br>commit fe8f80c</div>
+  <div class="mh-sub">A Dyson-sphere search plan for the 1,133 Breakthrough Listen Green Bank stars</div>
+</header>
+
+<section>
+  <div class="eyebrow">The question</div>
+  <p class="hero-q">If someone around these stars were catching starlight, <em>the heat has to go somewhere.</em> Can we audit the books?</p>
+  <p class="hero-a">Energy is conserved · a swarm that eats light must glow · WISE can see the glow</p>
+
+  <div class="stats">
+    <div class="stat"><span class="chip c-probe">probe</span><b>1,133</b><span>Green Bank stars, all within 50 pc · median 22 pc</span></div>
+    <div class="stat"><span class="chip c-probe">probe</span><b>905</b><span>with clean 12 + 22 <span style="text-transform:none">µm</span> photometry</span></div>
+    <div class="stat"><span class="chip c-probe">probe</span><b>~15 s</b><span>whole-sample cross-match, AllWISE + Gaia DR3</span></div>
+    <div class="stat"><span class="chip c-comp">computed</span><b>10⁻⁴–10⁻³</b><span>covering fraction reachable, 100–600 K swarms</span></div>
+  </div>
+</section>
+
+<!-- 01 -->
+<section class="sec" id="s1">
+  <div class="sec-num">01 · The answer</div>
+  <h2>A limit, not a detection.</h2>
+  <p class="blurb">Every Dyson-sphere candidate so far has turned out to be dust or a galaxy behind the star. Our edge is a sample where that trick mostly can't work.</p>
+  <div class="verdict">
+    <p><span class="k">Recommended first step</span>One session: freeze the IR rejection ladder, resolve all 1,133 stars to Gaia IDs, and cross-match with positions moved to each catalogue's date. Then run the ladder on two control sets <em>before</em> any real star is scored: known debris disks (η Crv, Vega, Fomalhaut, ε Eri), and the Project Hephaistos candidates the literature has since eliminated.</p>
+    <p><span class="k">Why this sample</span>The field's main false positive is a faint dusty galaxy hiding inside WISE's 6–12″ beam. Around nearby, bright stars that galaxy is a few-percent bump, not a 60× excess. The radio half of a joint limit is already being measured by seti-hunter on the same stars.</p>
+    <p><span class="k">Expected product</span>A per-star table: the largest waste-heat covering fraction WISE still allows, next to seti-hunter's narrowband radio limit. A short RNAAS note of its own that cites seti-hunter is the recommended form; folding it into seti-hunter's own note is the alternative (D1).</p>
+  </div>
+</section>
+
+<!-- 02 -->
+<section class="sec" id="s2">
+  <div class="sec-num">02 · Prior audits</div>
+  <h2>Who looked, and what got eliminated.</h2>
+  <p class="blurb">Forty years of searching, a handful of candidates, and every one reassigned to nature or to the background.</p>
+
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>Search</th><th>Sample · method</th><th>Found</th><th>What eliminated it</th></tr></thead>
+    <tbody>
+      <tr><td>Carrigan 2009 <span class="who">IRAS · [1]</span></td><td>~250,000 sources, 96% of sky; 100–600 K blackbody fits</td><td>A few ambiguous; upper limits to ~300 pc</td><td>Known stellar mimics</td></tr>
+      <tr><td>Ĝ I–III · Wright, Griffith 2014–15 <span class="who">WISE · [2–4]</span></td><td>~10⁵ galaxies; red extended sources vetted</td><td>No galaxy reprocessing &gt;85% of starlight; 50 consistent with &gt;50%</td><td>Star formation, a dusty Be star, a young cluster</td></tr>
+      <tr><td>Ĝ IV · Wright 2016 <span class="who">transits · [5]</span></td><td>Ten megastructure-vs-planet transit signatures</td><td>Boyajian's Star named an "outstanding SETI target"</td><td>KIC 12557548, CoRoT-29: natural</td></tr>
+      <tr><td>Hephaistos I · Suazo 2022 <span class="who">Gaia DR2 + AllWISE · [6]</span></td><td>~2.7×10⁵ stars ≤100 pc; ~2.9×10⁸ ≤5 kpc</td><td>≤2×10⁻⁵ host a 90%-complete ~300 K sphere (≤100 pc)</td><td>Population limit — the benchmark</td></tr>
+      <tr><td>Hephaistos II · Suazo 2024 <span class="who">+2MASS, CNN · [7]</span></td><td>~5×10⁶ sources ≤300 pc</td><td>7 M-dwarf candidates, γ 0.03–0.16</td><td>Background galaxies &amp; AGN — see the funnel below</td></tr>
+      <tr><td>Contardo &amp; Hogg 2024 <span class="who">AJ 168 · [14]</span></td><td>4,898,812 FGK stars; ML-predicted W1/W2</td><td>53 hot-excess objects</td><td>All consistent with extreme debris disks</td></tr>
+      <tr><td>Boyajian's Star <span class="who">2016–18 · [15–18]</span></td><td>Kepler dips to ~20%, no IR excess</td><td>Dips are chromatic</td><td>Optically thin dust (&lt;1 µm grains); radio silent 1–10 GHz</td></tr>
+      <tr><td>Zackrisson 2018 <span class="who">Gaia × RAVE · [19]</span></td><td>"Too faint for its parallax"</td><td>TYC 6111-1162-1, 2× too faint</td><td>Likely unseen white-dwarf companion</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="fig">
+    <span class="fig-label">Fig. 01 — Hephaistos II, five million down to seven</span>
+    <div class="bars">
+      <!-- MARK: width = log10(n) / log10(5e6). Ruler is LOG. Counts from [7b]. -->
+      <div class="lbl">Within 300 pc</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="num">~5,000,000</div>
+      <div class="lbl">W3 + W4 detected, clean flags</div><div class="track"><div class="fill" style="width:82.2%"></div></div><div class="num">~320,000</div>
+      <div class="lbl">Dyson-sphere model fit ≤0.2 mag</div><div class="track"><div class="fill" style="width:60.5%"></div></div><div class="num">11,243</div>
+      <div class="lbl">CNN: not in nebula</div><div class="track"><div class="fill" style="width:56.1%"></div></div><div class="num">5,732</div>
+      <div class="lbl">No Hα, variability, RUWE, extent</div><div class="track"><div class="fill" style="width:55.4%"></div></div><div class="num">5,137</div>
+      <div class="lbl">SNR &gt;3.5 in W3 and W4</div><div class="track"><div class="fill" style="width:38.3%"></div></div><div class="num">368</div>
+      <div class="lbl">Visual inspection</div><div class="track"><div class="fill hot" style="width:12.6%"></div></div><div class="num">7</div>
+    </div>
+    <p class="caption">Log ruler · bar length = log₁₀(count) · counts from the paper's cut table [7b]</p>
+
+    <h3>What became of the candidates</h3>
+    <div class="tiles">
+      <div class="tile strong"><b>A</b><span>Suggestive contamination · offset radio source [8, 10]</span></div>
+      <div class="tile strong"><b>B</b><span>Significant contamination · radio counterpart [10]</span></div>
+      <div class="tile strong"><b>C</b><span>Significant contamination · NIR companion 3.75″ [10]</span></div>
+      <div class="tile elim"><b>D</b><span>Eliminated · JWST: Hot DOG at z≈0.9, ~1″ away [12]</span></div>
+      <div class="tile elim"><b>E</b><span>Eliminated · JWST: dusty starburst at z≈0.4 [12]</span></div>
+      <div class="tile weak"><b>F</b><span>Marginal contamination evidence [10]</span></div>
+      <div class="tile elim"><b>G</b><span>Eliminated · VLBI: background radio-loud AGN [9]</span></div>
+      <div class="tile weak"><b>H</b><span>Marginal · added in later papers [10, 11]</span></div>
+      <div class="tile none"><b>I</b><span>No obvious contamination yet [10]</span></div>
+      <div class="tile weak"><b>J</b><span>Marginal · added in later papers [10, 11]</span></div>
+    </div>
+    <p class="caption">Archival diagnostics [10] saw "no obvious contamination" at D; JWST [12] then found a galaxy 1″ away. Archival checks under-eliminate — the lesson for our rung ②.</p>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="sec" id="s3">
+  <div class="sec-num">03 · The signatures</div>
+  <h2>Five ways a swarm could show.</h2>
+  <p class="blurb">Each checked against the physics before it gets a place in the plan. One carries the search; the others support it.</p>
+
+  <div class="cards">
+    <div class="card primary">
+      <div class="k"><span>Primary channel</span><span class="chip c-comp">computed</span></div>
+      <h4>Mid-infrared waste heat</h4>
+      <p>A shell at 1 AU from the Sun sits at 331–394 K and peaks near 10 µm — right in WISE's 12 and 22 µm bands. A swarm catching just 0.1% of a Sun-like star's light at 300 K adds about twice the star's own 22 µm flux. Energetics are not the problem; calibration, saturation and confusion set the limit. Reflective or very cold (&lt;100 K) swarms escape, so every limit names its 100–600 K blackbody model.</p>
+    </div>
+    <div class="card">
+      <div class="k"><span>Cross-check</span><span class="chip c-ash">low prior</span></div>
+      <h4>Dimming without the glow</h4>
+      <p>Light removed must re-emerge. Dimming with no WISE excess means the heat is colder than ~50–100 K or beamed away. Colour-dependent dimming means dust, as at Boyajian's Star. Gaia DR4 epoch photometry would sharpen this; ESA gives no date yet.</p>
+    </div>
+    <div class="card">
+      <div class="k"><span>Side channel</span><span class="chip c-ash">weak here</span></div>
+      <h4>Anomalous transit shapes</h4>
+      <p>A transit needs alignment: about a 0.5% chance at 1 AU. Over 1,133 stars that is a handful of aligned systems even if every star had a swarm. Keep it in a "weird anything" bin with no limit claimed. TESS coverage of the sample is unchecked.</p>
+    </div>
+    <div class="card">
+      <div class="k"><span>Identity only</span><span class="chip c-probe">probe</span></div>
+      <h4>Gaia oddities</h4>
+      <p>"Too faint for its parallax" fails mainly through binaries. 270 of 1,117 matched stars have RUWE &gt; 1.4 — a binarity and brightness flag, not a technosignature. Use Gaia for identity, distance and the photosphere.</p>
+    </div>
+    <div class="card">
+      <div class="k"><span>Independent evidence</span><span class="chip c-held">in hand</span></div>
+      <h4>Radio, two ways</h4>
+      <p>A swarm need not leak radio, so radio confirms nothing. It does two clean jobs: VLASS (2–4 GHz, 2.5″) catches the background AGN that eliminated candidate G, and seti-hunter's per-star narrowband limits fill the joint table.</p>
+    </div>
+  </div>
+
+  <div class="fig">
+    <span class="fig-label">Fig. 02 — Excess as a fraction of the photosphere</span>
+    <div class="tblwrap">
+    <table>
+      <thead><tr><th>Host</th><th>Swarm</th><th>Covers</th><th class="n nt">3.4 µm</th><th class="n nt">4.6 µm</th><th class="n nt">12 µm</th><th class="n nt">22 µm</th></tr></thead>
+      <tbody>
+        <tr><td>Sun-like G2V</td><td>300 K</td><td>0.1%</td><td class="n">1×10⁻⁴</td><td class="n">3×10⁻³</td><td class="n">0.59</td><td class="n"><b>2.1</b></td></tr>
+        <tr><td>Sun-like G2V</td><td>100 K</td><td>0.1%</td><td class="n">~0</td><td class="n">~0</td><td class="n">0.016</td><td class="n"><b>1.9</b></td></tr>
+        <tr><td>Sun-like G2V</td><td>600 K</td><td>0.1%</td><td class="n">8×10⁻³</td><td class="n">0.034</td><td class="n">0.31</td><td class="n">0.52</td></tr>
+        <tr><td>M3 dwarf</td><td>300 K</td><td>0.1%</td><td class="n">3×10⁻⁵</td><td class="n">7×10⁻⁴</td><td class="n">0.13</td><td class="n">0.45</td></tr>
+        <tr><td>M3 dwarf</td><td>300 K</td><td>1%</td><td class="n">3×10⁻⁴</td><td class="n">7×10⁻³</td><td class="n">1.3</td><td class="n"><b>4.5</b></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="caption"><span class="chip c-comp">computed</span> blackbody star + blackbody swarm, energy conserved, no reflection · physics.py, this session · not a measurement</p>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="sec" id="s4">
+  <div class="sec-num">04 · The ladder</div>
+  <h2>Every flag goes down five rungs.</h2>
+  <p class="blurb">Same rules as seti-hunter's radio ladder: fixed order, frozen before the run, the first rung that eliminated each object goes in the Ledger. Objects that can't be tested are Untested, never passed.</p>
+
+  <ol class="ladder">
+    <li data-r="1"><b>Artifact.</b> The excess sits on a WISE artifact or saturation flag, or vanishes when re-measured.<span class="src">AllWISE ccf · ext · qph · unWISE · CatWISE2020</span></li>
+    <li data-r="2"><b>Confusion.</b> The infrared centroid is offset from the Gaia position, or another optical, NIR or radio source sits inside the 22 µm beam.<span class="src">Gaia DR3 · deep imaging (coverage unverified) · VLASS</span></li>
+    <li data-r="3"><b>Natural dust.</b> A known debris disk, silicate feature, resolved disk, or signs of youth.<span class="src">Literature · Spitzer &amp; Herschel archives</span></li>
+    <li data-r="4"><b>Star class.</b> Giants, AGB stars and Be stars glow in the infrared on their own. The sample includes Arcturus, Aldebaran and Kochab.<span class="src">Gaia CMD · SIMBAD spectral type</span></li>
+    <li data-r="5"><b>Not re-found.</b> The excess disagrees between AllWISE, unWISE and NEOWISE epochs, or with Spitzer.<span class="src">NEOWISE single exposures, 2013–2024</span></li>
+    <li class="end"><b>Survivor.</b> Held privately, fitted as sphere versus dust, second reviewer (Codex, graded). Only then a JWST or ALMA proposal.</li>
+  </ol>
+  <p>Confusion (②) is checked before dust (③) on purpose: a known disk star can also have a galaxy behind it, and the instrument problem should be recorded before the literature explains it away.</p>
+
+  <div class="two">
+    <div class="box">
+      <span class="k">Positive controls — must flag, then be eliminated at ③</span>
+      <ul>
+        <li>η Crv — verified warm disk; flags in the dry run at W3−W4 = +0.56 <span class="chip c-probe">probe</span></li>
+        <li>ε Eri — W3−W4 = +0.34 <span class="chip c-probe">probe</span></li>
+        <li>Vega, Fomalhaut — classic disks <span class="chip c-unv">not opened</span></li>
+      </ul>
+      <p style="margin-top:8px">A run that misses these is invalid.</p>
+    </div>
+    <div class="box">
+      <span class="k">External test set — must be eliminated at ① or ②</span>
+      <p>The Hephaistos candidates A–J, run through our own code. D, E and G have known answers. If D or E pass, rung ② is too weak — expected for archival-only checks, and the note says so.</p>
+      <p style="margin-top:8px"><b>Injection-recovery</b> sets the limits: synthetic swarms added to each star's real photometry, run through the identical pipeline.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="sec" id="s5">
+  <div class="sec-num">05 · The novel angle</div>
+  <h2>The stars we already listened to.</h2>
+  <p class="blurb">A sample-wide cross-match of the Green Bank stars against AllWISE and Gaia DR3, run this session through CDS X-Match.</p>
+
+  <div class="fig">
+    <span class="fig-label">Fig. 03 — Feasibility probe, all 1,133 stars</span>
+    <div class="bars">
+      <!-- MARK: width = count / 1133 uploaded. Ruler is LINEAR. Counts from xmatch_probe.py. -->
+      <div class="lbl">AllWISE source within 20″</div><div class="track"><div class="fill" style="width:98.4%"></div></div><div class="num">1,115</div>
+      <div class="lbl">Gaia DR3 source within 20″</div><div class="track"><div class="fill" style="width:98.6%"></div></div><div class="num">1,117</div>
+      <div class="lbl">3.4 µm saturated</div><div class="track"><div class="fill cool" style="width:95.0%"></div></div><div class="num">1,076</div>
+      <div class="lbl">Clean 12 + 22 µm</div><div class="track"><div class="fill hot" style="width:79.9%"></div></div><div class="num">905</div>
+      <div class="lbl">Artifact flag, any band</div><div class="track"><div class="fill cool" style="width:41.2%"></div></div><div class="num">467</div>
+      <div class="lbl">No Gaia source (too bright)</div><div class="track"><div class="fill cool" style="width:1.4%"></div></div><div class="num">16</div>
+      <div class="lbl">First dry-run flags, W3−W4 &gt; 0.5</div><div class="track"><div class="fill hot" style="width:0.44%"></div></div><div class="num">5</div>
+    </div>
+    <p class="caption"><span class="chip c-probe">probe</span> linear ruler · bar = count ÷ 1,133 uploaded · clean stars: median W3−W4 +0.07, 95th percentile +0.20 mag</p>
+  </div>
+
+  <p class="dropcap">The five dry-run flags are not candidates; they are what the ladder is for. η Crv is a textbook warm debris disk, which shows the machinery sees real dust. ζ Lep has interferometric hints of inner material <span class="chip c-unv">unverified</span>. γ Oph, 73 Her and BD−07 699 are unexamined, and BD−07 699 sits on a diffraction-spike flag — a likely rung ① elimination.</p>
+
+  <h3>Three snags, each with a fix</h3>
+  <ol class="moves">
+    <li><div><b>The CSV positions can't be matched directly.</b> They are coarse and mix epochs. GJ 1002 moves ~2″ a year; its 2MASS counterpart sits 40.8″ from the listed position, and a naive 30″ search returns two unrelated faint stars. <span class="chip c-probe">probe</span><span class="fix">Resolve each star to a Gaia ID, move its position to each catalogue's date, then match.</span></div></li>
+    <li><div><b>The short WISE bands are saturated.</b> 1,076 of 1,115 matched stars, and 2MASS fails for the brightest (Sirius's row reads J = H = K = −1.39). <span class="chip c-probe">probe</span><span class="fix">Model the photosphere from Gaia, and use the W3−W4 colour, which needs no model and covers 100–300 K swarms. 600 K swarms depend on the photosphere model, the main systematic.</span></div></li>
+    <li><div><b>Bright stars, giants and multiples.</b> 16 stars are too bright for Gaia, the sample includes giants, and Sirius returns two artifact-flagged rows. <span class="chip c-probe">probe</span><span class="fix">A separate bright/evolved class through rung ④, reported as Untested where the photometry can't support a test.</span></div></li>
+  </ol>
+
+  <div class="stamps">
+    <div class="stampcell"><span class="stamp feasible">Feasible</span><span class="stamp-note">seconds of compute · the work is identity + photosphere</span></div>
+  </div>
+
+  <h3>What the joint limit is, and isn't</h3>
+  <p>Putting the two limits side by side tightens neither. Its value is a per-star statement: <em>around star X, no 100–600 K swarm above covering fraction f, and no narrowband transmitter above EIRP E during the 2016–19 observations.</em> I found no prior paper doing this for the Breakthrough Listen sample in two searches — probable, not proven, until an ADS check. An optional extension covers ~288,000 field stars inside the Green Bank beams, already catalogued with Gaia IDs and radio limits [33].</p>
+</section>
+
+<!-- 06 -->
+<section class="sec" id="s6">
+  <div class="sec-num">06 · What gets published</div>
+  <h2>A negative result is the likely product.</h2>
+  <p class="blurb">The expected outcome is a limit table and a debris-disk census. A survivor would be held privately until JWST-class confirmation.</p>
+
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>Outcome</th><th>Form</th><th>Venue</th></tr></thead>
+    <tbody>
+      <tr><td><b>Limits</b> <span class="chip c-held">expected</span></td><td>Per-star covering-fraction limits, the joint radio + IR table, ladder counts, control outcomes</td><td>Short RNAAS note of its own, cross-citing seti-hunter <span class="chip c-unv">length rules unchecked</span></td></tr>
+      <tr><td><b>Warm-dust census</b></td><td>Any W3/W4 excess not already in the literature</td><td>The same note — natural discoveries count</td></tr>
+      <tr><td><b>Survivor</b> <span class="chip c-ash">unlikely</span></td><td>Private review → Codex → Spitzer archive → JWST/ALMA proposal</td><td>Never announced before confirmation</td></tr>
+      <tr><td><b>Section in seti-hunter's note</b></td><td>One paragraph, one table column</td><td>Only if the length budget allows</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="stamps">
+    <div class="stampcell"><span class="stamp emp">Empirical</span><span class="stamp-note">feasibility · measured on all 1,133</span></div>
+    <div class="stampcell"><span class="stamp emp">Empirical · toy</span><span class="stamp-note">sensitivity · 10% floor from 905 stars' colours</span></div>
+    <div class="stampcell"><span class="stamp conj">Conjecture</span><span class="stamp-note">novelty · two searches only</span></div>
+    <div class="stampcell"><span class="stamp null">Null expected</span><span class="stamp-note">detection · every prior candidate collapsed</span></div>
+  </div>
+
+  <div class="boundary">
+    <span class="k">Boundary</span>
+    <p>This plan does not constrain reflective swarms, swarms colder than ~100 K, or near-complete spheres that would have dimmed a star out of a sample chosen for being bright. Our per-star covering fraction is not the same quantity as Hephaistos I's population fraction; quoting both needs care. No Codex pressure-test was run — recommended before the ladder is frozen.</p>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="sec" id="s7">
+  <div class="sec-num">07 · Your calls</div>
+  <h2>Decisions that are Ben's.</h2>
+  <p class="blurb">Nothing below blocks the first session; D1 and D2 shape everything after it.</p>
+  <ol class="decisions">
+    <li><b>Shape.</b> A module inside seti-hunter with its own short note <span class="rec">recommended</span>, a separate project, or one section of seti-hunter's note.</li>
+    <li><b>Scope.</b> The 1,133 stars first <span class="rec">recommended</span>; optionally the ~288,000 field stars (needs field-star radio limits too). Not a five-million-star scan.</li>
+    <li><b>Dashboard.</b> An IR funnel and Ledger column on brokenbranch.dev/listen/, or keep IR off the live page until the note.</li>
+    <li><b>Survivor policy.</b> Reuse seti-hunter's private-review rule word for word <span class="rec">recommended</span>.</li>
+    <li><b>Timing.</b> Start now in parallel (it only reads seti-hunter's limits), or after seti-hunter's limits milestone. Either way the IR ladder can be frozen first.</li>
+    <li><b>Dimming channel.</b> Wait for Gaia DR4 epoch photometry, or drop it.</li>
+    <li><b>Wording.</b> Confirm "eliminated" applies to infrared objects exactly as to radio signals. The plan uses it throughout.</li>
+  </ol>
+</section>
+
+<!-- 08 -->
+<section class="sec" id="s8">
+  <div class="sec-num">08 · Milestones</div>
+  <h2>One bounded session each.</h2>
+  <p class="blurb">No swarms, no night shifts. The first two run together.</p>
+  <div class="rail">
+    <div class="seg first"><b>M0</b><span>Freeze the IR ladder, controls, Codex review</span><i>first session</i></div>
+    <div class="seg first"><b>M1</b><span>Gaia IDs + date-corrected cross-match</span><i>first session</i></div>
+    <div class="seg"><b>M2</b><span>Photosphere model + measured floor</span><i>next</i></div>
+    <div class="seg"><b>M3</b><span>Ladder run, controls first</span><i>next</i></div>
+    <div class="seg"><b>M4</b><span>Injection-recovery → per-star limits</span><i>next</i></div>
+    <div class="seg gated"><b>M5</b><span>Joint table with radio limits</span><i>needs seti-hunter M5</i></div>
+    <div class="seg gated"><b>M6</b><span>RNAAS draft</span><i>needs D1</i></div>
+  </div>
+</section>
+
+<!-- sources -->
+<section class="sec" id="sources">
+  <div class="sec-num">Sources</div>
+  <h2>Opened this session.</h2>
+  <p class="blurb">Numbering matches the plan document. Items marked unverified there stay unverified here.</p>
+  <ol class="sources">
+    <li>Carrigan 2009, ApJ 698, 2075 — <a href="https://arxiv.org/abs/0811.2376">arXiv:0811.2376</a></li>
+    <li>Wright et al. 2014, Ĝ I — <a href="https://arxiv.org/abs/1408.1133">arXiv:1408.1133</a></li>
+    <li>Wright et al. 2014, Ĝ II — <a href="https://arxiv.org/abs/1408.1134">arXiv:1408.1134</a></li>
+    <li>Griffith et al. 2015, Ĝ III — <a href="https://arxiv.org/abs/1504.03418">arXiv:1504.03418</a></li>
+    <li>Wright et al. 2016, Ĝ IV — <a href="https://arxiv.org/abs/1510.04606">arXiv:1510.04606</a></li>
+    <li>Suazo et al. 2022, Hephaistos I — <a href="https://arxiv.org/abs/2201.11123">arXiv:2201.11123</a></li>
+    <li>Suazo et al. 2024, Hephaistos II — <a href="https://arxiv.org/abs/2405.02927">arXiv:2405.02927</a> (7b: <a href="https://arxiv.org/html/2405.02927v1">HTML tables</a>)</li>
+    <li>Ren, Garrett &amp; Siemion 2024 — <a href="https://arxiv.org/abs/2405.14921">arXiv:2405.14921</a></li>
+    <li>Ren et al. 2025, MNRAS 538, L56 — <a href="https://arxiv.org/abs/2501.05152">arXiv:2501.05152</a></li>
+    <li>Ren et al. 2026, archival diagnostics — <a href="https://arxiv.org/abs/2607.03619">arXiv:2607.03619</a></li>
+    <li>Korn et al. 2026, Hephaistos III — <a href="https://arxiv.org/abs/2607.25701">arXiv:2607.25701</a></li>
+    <li>Zackrisson et al. 2026, Hephaistos IV (JWST) — <a href="https://arxiv.org/abs/2607.09460">arXiv:2607.09460</a></li>
+    <li>Blain 2024 — <a href="https://arxiv.org/abs/2409.11447">arXiv:2409.11447</a></li>
+    <li>Contardo &amp; Hogg 2024, AJ 168 — <a href="https://arxiv.org/abs/2403.18941">arXiv:2403.18941</a></li>
+    <li>Boyajian et al. 2016 — <a href="https://arxiv.org/abs/1509.03622">arXiv:1509.03622</a></li>
+    <li>Marengo et al. 2015, ApJL 814, L15 — <a href="https://arxiv.org/abs/1511.07908">arXiv:1511.07908</a></li>
+    <li>Boyajian et al. 2018 — <a href="https://arxiv.org/abs/1801.00732">arXiv:1801.00732</a></li>
+    <li>Harp et al. 2016, ApJ 825, 155 — <a href="https://arxiv.org/abs/1511.01606">arXiv:1511.01606</a></li>
+    <li>Zackrisson et al. 2018 — <a href="https://arxiv.org/abs/1804.08351">arXiv:1804.08351</a></li>
+    <li>Amiri 2026 — <a href="https://arxiv.org/abs/2602.23270">arXiv:2602.23270</a></li>
+    <li>Luo &amp; Liu 2026 — <a href="https://arxiv.org/abs/2602.23004">arXiv:2602.23004</a></li>
+    <li>Lacki et al. 2021, BL exotica — <a href="https://arxiv.org/abs/2006.11304">arXiv:2006.11304</a></li>
+    <li>Wright 2020, Dyson Spheres review — <a href="https://arxiv.org/abs/2006.16734">arXiv:2006.16734</a></li>
+    <li>ESA, Gaia DR4 content — <a href="https://www.cosmos.esa.int/web/gaia/dr4">cosmos.esa.int</a></li>
+    <li>Lacy et al. 2020, VLASS — <a href="https://arxiv.org/abs/1907.01981">arXiv:1907.01981</a></li>
+    <li>Price et al. 2020, AJ 159, 86 — <a href="https://arxiv.org/abs/1906.07750">arXiv:1906.07750</a></li>
+    <li>IRSA, AllWISE release — <a href="https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/">irsa.ipac.caltech.edu</a></li>
+    <li>IRSA, WISE Explanatory Supplement §1.1 — <a href="https://irsa.ipac.caltech.edu/data/WISE/docs/release/All-Sky/expsup/sec1_1.html">irsa.ipac.caltech.edu</a></li>
+    <li>Lebreton et al. 2016, η Crv — <a href="https://arxiv.org/abs/1511.05207">arXiv:1511.05207</a></li>
+    <li>Schlafly et al. 2019, unWISE — <a href="https://arxiv.org/abs/1901.03337">arXiv:1901.03337</a></li>
+    <li>Marocco et al. 2021, CatWISE2020 — <a href="https://arxiv.org/abs/2012.13084">arXiv:2012.13084</a></li>
+    <li>IRSA, NEOWISE release — <a href="https://irsa.ipac.caltech.edu/data/WISE/docs/release/NEOWISE/">irsa.ipac.caltech.edu</a></li>
+    <li>Wlodarczyk-Sroka et al. 2020, MNRAS 498, 5720 — <a href="https://cdsarc.cds.unistra.fr/VizieR/ftp/J/MN/498/5720/ReadMe">VizieR ReadMe</a></li>
+    <li>Gaia DR3 cross-match tables — <a href="https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_cross-matches/">ESA docs</a> (not opened)</li>
+    <li>Eisenhardt et al. 2012, ApJ 755, 173 — <a href="https://arxiv.org/abs/1208.5517">arXiv:1208.5517</a></li>
+  </ol>
+</section>
+
+<footer>
+  <div class="colophon">
+    <div><b>Origin</b>Rendered from docs/research/2026-10-17-dyson-sphere-search-plan.md · fe8f80c</div>
+    <div><b>Project</b>seti-hunter · Broken Branch · companion study, plan stage</div>
+    <div><b>Filed</b>17 Oct 2026 · light paper register · zero JS · no media</div>
+  </div>
+  <p class="signoff">Chips mark what was measured, computed, or left unverified. Strogies supervised the old audits from a sunbeam, as was tradition.</p>
+  <p class="endmark">❦</p>
+</footer>
+
+</div>
+</body>
+</html>
