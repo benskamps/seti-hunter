@@ -96,6 +96,12 @@ def load_spectrogram_fast(filepath: str, max_chans_per_chunk: int = 1_048_576):
     return raw, freqs, header
 
 
+def track_span_s(header: dict, n_time: int) -> float:
+    """Time between the first and last spectra of a scan. A de-Doppler track with a total
+    shift of s bins moves s bins over this span (n_time - 1 sample intervals)."""
+    return max((n_time - 1) * header.get("tsamp_s", 18.25), 1.0)
+
+
 def normalize_bandpass(data: np.ndarray, tile_width: int = 256) -> np.ndarray:
     """
     Removes coarse-channel polyphase filterbank (PFB) bandpass shape and DC spikes.
@@ -193,9 +199,8 @@ def extract_tile_features(z_tiles: np.ndarray, header: dict, tile_width: int = 2
 
     # 1. Classical & Drifting Narrowband Metric (Axis 1)
     drift_snr, drift_bins, best_chan = compute_dedoppler_snr(z_tiles, max_shift_bins=10)
-    duration_s = max(header.get("total_duration_s", 300.0), 1.0)
     foff_hz = header.get("foff_hz", 2800.0)
-    drift_rate_hz_s = (drift_bins * foff_hz) / duration_s
+    drift_rate_hz_s = (drift_bins * foff_hz) / track_span_s(header, T)
 
     # Zero-drift static SNR (pure vertical line indicator — often local oscillator RFI)
     static_snr = np.max(np.sum(z_tiles, axis=0) / math.sqrt(max(T, 1)), axis=1)
@@ -364,8 +369,25 @@ def assess_cadence(
     Runs the full 5-axis SETI Weirdness Assessment on an ON-target file and
     performs an ON/OFF sky-localization veto against a single OFF-target file.
     """
+    on = load_spectrogram_fast(on_filepath)
+    off = load_spectrogram_fast(off_filepath) if (off_filepath and os.path.exists(off_filepath)) else None
+    summary = assess_arrays(on, off, tile_width=tile_width, top_k=top_k)
+    summary["on_file"] = os.path.basename(on_filepath)
+    summary["off_file"] = os.path.basename(off_filepath) if off_filepath else None
+    return summary
+
+
+def assess_arrays(
+    on: tuple[np.ndarray, np.ndarray, dict],
+    off: tuple[np.ndarray, np.ndarray, dict] | None = None,
+    tile_width: int = 256,
+    top_k: int = 8,
+) -> dict:
+    """assess_cadence on already-loaded (data, freqs, header) tuples, as returned by
+    load_spectrogram_fast. Also returns a negative control: the strongest carrier in
+    the OFF scan, which any working cadence check must call RFI."""
     t0 = time.time()
-    on_raw, on_freqs, on_hdr = load_spectrogram_fast(on_filepath)
+    on_raw, on_freqs, on_hdr = on
     on_z, usable_chans = normalize_bandpass(on_raw, tile_width=tile_width)
     on_freqs = on_freqs[:usable_chans]
 
@@ -375,23 +397,32 @@ def assess_cadence(
 
     feats = extract_tile_features(on_tiles, on_hdr, tile_width=tile_width)
 
-    # Load and normalize OFF-target scan if provided
+    # Normalize the OFF-target scan if provided
     off_tiles = None
-    off_hdr = None
-    if off_filepath and os.path.exists(off_filepath):
-        off_raw, off_freqs, off_hdr = load_spectrogram_fast(off_filepath)
+    if off is not None:
+        off_raw, off_freqs, off_hdr = off
         off_z, off_usable = normalize_bandpass(off_raw, tile_width=tile_width)
         common_tiles = min(N_tiles, off_usable // tile_width)
         off_tiles = off_z[:, : common_tiles * tile_width].reshape(off_z.shape[0], common_tiles, tile_width)
 
     # Compute OFF-target activity at every corresponding frequency tile
     off_peak_snr = np.ones(N_tiles, dtype=np.float32) * 2.5
+    negative_control = None
     if off_tiles is not None:
         T_off = off_tiles.shape[0]
         c_tiles = off_tiles.shape[1]
-        off_drift_snr, _, _ = compute_dedoppler_snr(off_tiles, max_shift_bins=6)
+        off_drift_snr, off_drift_bins, off_best_chan = compute_dedoppler_snr(off_tiles, max_shift_bins=6)
         off_max_point = np.max(off_tiles, axis=(0, 2)) / 2.0
         off_peak_snr[:c_tiles] = np.maximum(off_drift_snr, off_max_point)
+        k = int(np.argmax(off_drift_snr))
+        negative_control = {
+            "label": "control: strongest OFF_1 carrier",
+            "tile_idx": k,
+            "peak_freq_mhz": float(off_freqs[k * tile_width + int(off_best_chan[k])]),
+            "drift_rate_hz_s": float(off_drift_bins[k]) * off_hdr["foff_hz"] / track_span_s(off_hdr, T_off),
+            "t_ref_mjd": off_hdr["tstart_mjd"],
+            "off_drift_snr": round(float(off_drift_snr[k]), 2),
+        }
 
     # ON vs OFF Exclusivity Ratio (higher means signal ONLY exists when pointing at the star)
     on_effective_snr = np.maximum(feats["drift_snr"], feats["ts_max"] * 0.7)
@@ -464,6 +495,7 @@ def assess_cadence(
             "static_snr": round(float(feats["static_snr"][idx]), 2),
             "drift_bins": int(feats["drift_bins"][idx]),
             "drift_rate_hz_s": round(float(feats["drift_rate_hz_s"][idx]), 3),
+            "t_ref_mjd": on_hdr["tstart_mjd"],
             "burst_score": round(float(feats["burst_score"][idx]), 2),
             "kurtosis": round(float(feats["kurtosis"][idx]), 2),
             "ts_max": round(float(feats["ts_max"][idx]), 2),
@@ -489,8 +521,6 @@ def assess_cadence(
     elapsed = time.time() - t0
     summary = {
         "source_name": on_hdr["source_name"],
-        "on_file": os.path.basename(on_filepath),
-        "off_file": os.path.basename(off_filepath) if off_filepath else None,
         "header": on_hdr,
         "n_tiles_evaluated": int(N_tiles),
         "n_channels_evaluated": int(usable_chans),
@@ -501,6 +531,7 @@ def assess_cadence(
         "rfi_vetoed_tiles": int(np.sum(off_peak_snr > OFF_DETECTION_SNR)),
         "sky_localized_tiles_gt_15": int(np.sum((total_weirdness_score > 15.0) & (off_peak_snr <= OFF_DETECTION_SNR))),
         "candidates": candidates,
+        "negative_control": negative_control,
     }
     return summary
 
@@ -613,6 +644,214 @@ def run_synthetic_verification_benchmark() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Full-cadence test (ON/OFF/ON/OFF[/ON/OFF]) for Stage 1 candidates
+# ---------------------------------------------------------------------------
+CADENCE_PRESENT_SNR = OFF_DETECTION_SNR  # same "present" bar as the Stage 1 OFF veto
+CADENCE_SEARCH_BASE = 6                  # +/- channels searched around the predicted track
+CADENCE_SEARCH_MAX = 40
+CADENCE_BG_CHANS = 400                   # offsets beyond the search window used for the noise floor
+CADENCE_VERDICTS = ("PASSES", "ONE-OFF", "PARTIAL", "RFI", "NOT-RECOVERED", "UNTESTED")
+
+
+def cadence_search_chans(dt_s: float, track_span: float) -> int:
+    """Stage 1 quantizes drift to whole bins per scan, so the predicted position drifts off
+    by up to ~1 channel per scan length of elapsed time. Widen the window to match."""
+    return int(min(CADENCE_SEARCH_MAX, CADENCE_SEARCH_BASE + math.ceil(abs(dt_s) / track_span)))
+
+
+def drift_aligned_snr(
+    z: np.ndarray, freqs: np.ndarray, hdr: dict, sig: dict, search_chans: int, method: str = "dedoppler"
+) -> dict | None:
+    """
+    Measures a signal in one scan of a cadence. z is the normalize_bandpass() spectrogram
+    (n_time, n_chans) with ascending freqs. sig has peak_freq_mhz at time t_ref_mjd and a
+    drift_rate_hz_s. For every channel offset within +/-(search + background) of the
+    predicted track, the scan is summed ALONG the drift track (de-Doppler), so a drifting
+    signal keeps its full SNR. The SNR is the best offset in the search window against the
+    robust spread of the background offsets. Returns None if the track leaves the band.
+
+    method="timemean" reproduces the 2026-10-16 cadence_check.py measurement (a time-mean
+    spectrum, +/-40 channels around the track's mid-scan position) for regression tests.
+    """
+    T, N = z.shape
+    df_mhz = float(freqs[1] - freqs[0])
+    t_rows = (hdr["tstart_mjd"] - sig["t_ref_mjd"]) * 86400.0 + np.arange(T) * hdr["tsamp_s"]
+    if method == "timemean":
+        t_rows = np.full(T, t_rows.mean())
+        search_chans = CADENCE_SEARCH_MAX
+    f_rows = sig["peak_freq_mhz"] + sig["drift_rate_hz_s"] * t_rows / 1e6
+    c_rows = np.rint((f_rows - freqs[0]) / df_mhz).astype(np.int64)
+
+    half = search_chans + 8 + CADENCE_BG_CHANS
+    offs = np.arange(-half, half + 1)
+    idx = c_rows[:, None] + offs[None, :]
+    inside = (idx >= 0) & (idx < N)
+    win = np.abs(offs) <= search_chans
+    if not inside[:, win].all():
+        return None
+    vals = np.where(inside, z[np.arange(T)[:, None], np.clip(idx, 0, N - 1)], 0.0)
+    n_in = inside.sum(axis=0)
+    dd = vals.sum(axis=0) / np.sqrt(np.maximum(n_in, 1))
+
+    bg = dd[(np.abs(offs) > search_chans + 8) & (n_in == T)]
+    med = float(np.median(bg))
+    sigma = max(1.4826 * float(np.median(np.abs(bg - med))), 1e-6)
+    k = int(np.argmax(np.where(win, dd, -np.inf)))
+    return {"snr": (float(dd[k]) - med) / sigma, "offset_ch": int(offs[k]), "search_chans": int(search_chans)}
+
+
+def cadence_verdict(scans: list[dict]) -> tuple[str, str]:
+    """
+    scans: per-scan rows in observing order with "role" (ON/OFF) and "present" (bool, or
+    None if the track left the band). Returns (verdict, detail):
+      RFI           - present in any OFF scan
+      PASSES        - present in every ON scan and no OFF scan
+      ONE-OFF       - present only in the first ON scan (the one Stage 1 scored)
+      NOT-RECOVERED - absent even from the first ON scan: the check could not see the
+                      Stage 1 signal, so it says nothing about the candidate
+      PARTIAL       - in some ON scans but not all
+      UNTESTED      - the cadence has no OFF scan
+    """
+    on = [s["present"] for s in scans if s["role"] == "ON"]
+    off = [s["present"] for s in scans if s["role"] == "OFF"]
+    detail = f"in {sum(bool(p) for p in on)}/{len(on)} ON, {sum(bool(p) for p in off)}/{len(off)} OFF"
+    if not off:
+        return "UNTESTED", detail + " (no OFF scan in this cadence)"
+    if any(off):
+        return "RFI", detail
+    if all(on):
+        return "PASSES", detail
+    if not on[0]:
+        return ("NOT-RECOVERED" if not any(on[1:]) else "PARTIAL"), detail
+    if not any(on[1:]):
+        return "ONE-OFF", detail
+    return "PARTIAL", detail
+
+
+def cadence_test_signals(
+    scan_loader, roles: list[str], signals: list[dict], method: str = "dedoppler", tile_width: int = 256
+) -> list[dict]:
+    """
+    Runs drift_aligned_snr for every signal in every scan. scan_loader(i) returns the
+    (data, freqs, header) tuple of scan i; scans are loaded one at a time to bound memory.
+    Each signal needs peak_freq_mhz, drift_rate_hz_s and t_ref_mjd, and gets back
+    "cadence_scans", "cadence_verdict" and "cadence_detail".
+    """
+    rows = [[] for _ in signals]
+    for i, role in enumerate(roles):
+        data, freqs, hdr = scan_loader(i)
+        z, usable = normalize_bandpass(data, tile_width=tile_width)
+        del data
+        freqs = freqs[:usable]
+        span = track_span_s(hdr, z.shape[0])
+        for j, sig in enumerate(signals):
+            dt = (hdr["tstart_mjd"] - sig["t_ref_mjd"]) * 86400.0 + 0.5 * span
+            m = drift_aligned_snr(z, freqs, hdr, sig, cadence_search_chans(dt, span), method=method)
+            rows[j].append({
+                "scan": i, "role": role, "dt_s": round(dt, 1),
+                "snr": None if m is None else round(m["snr"], 1),
+                "offset_ch": None if m is None else m["offset_ch"],
+                "search_chans": None if m is None else m["search_chans"],
+                "present": None if m is None else bool(m["snr"] >= CADENCE_PRESENT_SNR),
+            })
+        del z
+    out = []
+    for sig, r in zip(signals, rows):
+        verdict, detail = cadence_verdict(r)
+        out.append({**sig, "cadence_scans": r, "cadence_verdict": verdict, "cadence_detail": detail})
+    return out
+
+
+def run_synthetic_cadence_benchmark(method: str = "dedoppler", scans_used: int | None = None) -> dict:
+    """
+    Self-test of the full-cadence check, end to end: synthesizes a 6-scan ON/OFF/ON/OFF/ON/OFF
+    cadence (16 x 65,536 channels per scan), runs Stage 1 (assess_arrays) on ON_1 vs OFF_1,
+    then the cadence check on every Stage 1 candidate. Injected signals:
+      tile  40  drifting carrier in all 3 ON scans               -> PASSES
+      tile  90  drifting carrier in ON_1 only                     -> ONE-OFF
+      tile 115  weak fast drifter in all 3 ON (smeared ~1.3 sigma
+                per channel in a time-mean spectrum)              -> PASSES
+      tile 140  carrier in ON_1 and ON_2, not ON_3                -> PARTIAL
+      tile 230  carrier in ON_1 and OFF_2 only (Stage 1 sees no
+                OFF power and calls it sky-localized)             -> RFI
+      tile 190  zero-drift carrier in all 6 scans; the strongest
+                OFF_1 carrier, so it is the negative control      -> RFI
+    All five ON_1 signals must be Stage 1 candidates and every verdict must match.
+    method="timemean" (the old measurement) or scans_used=2 (score the first ON/OFF pair
+    only, i.e. no cadence check) must make this benchmark FAIL.
+    """
+    rng = np.random.default_rng(20261016)
+    T, N, W = 16, 65536, 256
+    tsamp, slew = 18.25, 30.0
+    span = (T - 1) * tsamp
+    roles = ["ON", "OFF", "ON", "OFF", "ON", "OFF"]
+    t0_mjd = 60000.0
+    tstarts = [t0_mjd + k * (T * tsamp + slew) / 86400.0 for k in range(6)]
+    freqs = 1420.0 + np.arange(N, dtype=np.float64) * 0.0028
+
+    # (tile, chan in tile at ON_1 t=0, channels drifted per scan span, amplitude, scans present, expected)
+    injections = [
+        (40, 100, 6.4, 4.0, {0, 2, 4}, "PASSES"),
+        (90, 120, -3.3, 4.5, {0}, "ONE-OFF"),
+        (115, 60, 9.6, 3.2, {0, 2, 4}, "PASSES"),
+        (140, 140, 2.6, 4.0, {0, 2}, "PARTIAL"),
+        (230, 80, -5.2, 4.2, {0, 3}, "RFI"),
+        (190, 128, 0.0, 3.0, {0, 1, 2, 3, 4, 5}, "RFI"),
+    ]
+    scans = []
+    for k in range(6):
+        data = rng.normal(loc=100.0, scale=1.0, size=(T, N)).astype(np.float32)
+        for tile, c_in, drift, amp, present, _ in injections:
+            if k not in present:
+                continue
+            for t in range(T):
+                elapsed = (tstarts[k] - t0_mjd) * 86400.0 + t * tsamp
+                data[t, int(round(tile * W + c_in + drift * elapsed / span))] += amp
+        hdr = {
+            "source_name": "SYNTHETIC_CADENCE", "fch1_mhz": float(freqs[0]), "foff_mhz": 0.0028,
+            "foff_hz": 2800.0, "tsamp_s": tsamp, "tstart_mjd": tstarts[k], "n_time": T,
+            "n_chans": N, "total_duration_s": T * tsamp, "bandwidth_mhz": N * 0.0028,
+        }
+        scans.append((data, freqs, hdr))
+
+    stage1 = assess_arrays(scans[0], scans[1], tile_width=W, top_k=8)
+    signals = [
+        {"label": f"tile {c['tile_idx']}", "tile_idx": c["tile_idx"], "peak_freq_mhz": c["peak_freq_mhz"],
+         "drift_rate_hz_s": c["drift_rate_hz_s"], "t_ref_mjd": c["t_ref_mjd"], "drift_snr": c["drift_snr"]}
+        for c in stage1["candidates"]
+    ] + [stage1["negative_control"]]
+    n = scans_used or len(scans)
+    tested = cadence_test_signals(lambda i: scans[i], roles[:n], signals, method=method, tile_width=W)
+    by_tile = {s["tile_idx"]: s for s in tested[:-1]}
+    control = tested[-1]
+
+    checks = {}
+    for tile, _, _, _, present, expected in injections:
+        if tile == 190:
+            checks["control_tile_190"] = {
+                "expected": "RFI", "got": control["cadence_verdict"], "tile": control["tile_idx"],
+                "ok": control["tile_idx"] == 190 and control["cadence_verdict"] == "RFI",
+            }
+            continue
+        got = by_tile.get(tile)
+        checks[f"tile_{tile}"] = {
+            "expected": expected,
+            "got": got["cadence_verdict"] if got else "not a Stage 1 candidate",
+            "on1_snr": got["cadence_scans"][0]["snr"] if got else None,
+            "stage1_drift_snr": got["drift_snr"] if got else None,
+            "ok": bool(got) and got["cadence_verdict"] == expected,
+        }
+    return {
+        "passed": all(c["ok"] for c in checks.values()),
+        "method": method,
+        "scans_used": n,
+        "checks": checks,
+        "stage1_candidate_tiles": [c["tile_idx"] for c in stage1["candidates"]],
+    }
+
+
 if __name__ == "__main__":
     res = run_synthetic_verification_benchmark()
     print(json.dumps(res, indent=2))
+    print(json.dumps(run_synthetic_cadence_benchmark(), indent=2))
