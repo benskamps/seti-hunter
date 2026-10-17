@@ -27,7 +27,7 @@ import json
 import os
 
 from targets_catalog import STAGE1_CADENCES
-from weirdness_engine import cadence_test_signals, load_spectrogram_fast
+from weirdness_engine import cadence_signal, cadence_test_signals, load_spectrogram_fast
 
 SCAN_KEYS = ("label", "role")
 
@@ -55,10 +55,7 @@ def run_cadence_check(cadence: dict, summary: dict, scan_paths: list[str], metho
         controls.append({"label": f"control: known RFI {rfi['peak_freq_mhz']:.4f} MHz",
                          "t_ref_mjd": summary["header"]["tstart_mjd"], **rfi})
 
-    signals = [
-        {"peak_freq_mhz": c["peak_freq_mhz"], "drift_rate_hz_s": c["drift_rate_hz_s"], "t_ref_mjd": c["t_ref_mjd"]}
-        for c in summary["candidates"]
-    ] + controls
+    signals = [cadence_signal(c) for c in summary["candidates"]] + controls
     tested = cadence_test_signals(_loader(scan_paths), roles, signals, method=method)
 
     for cand, res in zip(summary["candidates"], tested):

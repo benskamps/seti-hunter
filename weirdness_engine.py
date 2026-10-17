@@ -96,6 +96,9 @@ def load_spectrogram_fast(filepath: str, max_chans_per_chunk: int = 1_048_576):
     return raw, freqs, header
 
 
+STAGE1_MAX_DRIFT_BINS = 10  # Stage 1 de-Doppler bank: +/- this many bins per scan
+
+
 def track_span_s(header: dict, n_time: int) -> float:
     """Time between the first and last spectra of a scan. A de-Doppler track with a total
     shift of s bins moves s bins over this span (n_time - 1 sample intervals)."""
@@ -213,7 +216,7 @@ def extract_tile_features(z_tiles: np.ndarray, header: dict, tile_width: int = 2
     T, N_tiles, W = z_tiles.shape
 
     # 1. Classical & Drifting Narrowband Metric (Axis 1)
-    drift_snr, drift_bins, best_chan = compute_dedoppler_snr(z_tiles, max_shift_bins=10)
+    drift_snr, drift_bins, best_chan = compute_dedoppler_snr(z_tiles, max_shift_bins=STAGE1_MAX_DRIFT_BINS)
     foff_hz = header.get("foff_hz", 2800.0)
     drift_rate_hz_s = (drift_bins * foff_hz) / track_span_s(header, T)
 
@@ -436,6 +439,10 @@ def assess_arrays(
             "peak_freq_mhz": float(off_freqs[k * tile_width + int(off_best_chan[k])]),
             "drift_rate_hz_s": float(off_drift_bins[k]) * off_hdr["foff_hz"] / track_span_s(off_hdr, T_off),
             "t_ref_mjd": off_hdr["tstart_mjd"],
+            "drift_bins": int(off_drift_bins[k]),
+            "max_drift_bins": 6,
+            "ref_span_s": track_span_s(off_hdr, T_off),
+            "ref_foff_hz": off_hdr["foff_hz"],
             "off_drift_snr": round(float(off_drift_snr[k]), 2),
         }
 
@@ -511,6 +518,9 @@ def assess_arrays(
             "drift_bins": int(feats["drift_bins"][idx]),
             "drift_rate_hz_s": round(float(feats["drift_rate_hz_s"][idx]), 3),
             "t_ref_mjd": on_hdr["tstart_mjd"],
+            "max_drift_bins": STAGE1_MAX_DRIFT_BINS,
+            "ref_span_s": track_span_s(on_hdr, T),
+            "ref_foff_hz": on_hdr["foff_hz"],
             "burst_score": round(float(feats["burst_score"][idx]), 2),
             "kurtosis": round(float(feats["kurtosis"][idx]), 2),
             "ts_max": round(float(feats["ts_max"][idx]), 2),
@@ -709,6 +719,15 @@ SNR_AGREEMENT_TOL = 0.1                  # cadence vs Stage 1 SNR in the scan St
 CADENCE_VERDICTS = ("PASSES", "ONE-OFF", "PARTIAL", "RFI", "INCOMPLETE", "NOT-RECOVERED", "UNTESTED")
 
 
+# Keys a cadence test signal may carry (cadence_test_signals); the rest of a candidate is ignored.
+SIGNAL_KEYS = ("label", "tile_idx", "peak_freq_mhz", "drift_rate_hz_s", "t_ref_mjd", "drift_bins",
+               "max_drift_bins", "ref_span_s", "ref_foff_hz", "drift_snr")
+
+
+def cadence_signal(c: dict) -> dict:
+    return {k: c[k] for k in SIGNAL_KEYS if k in c}
+
+
 def cadence_search_chans(dt_s: float, ref_span: float) -> int:
     """Stage 1 quantizes drift to whole bins per track span of its own scan (ref_span), so
     the predicted position drifts off by <= 1/2 channel per ref_span of elapsed time (1 if
@@ -751,12 +770,19 @@ def drift_aligned_snr(
     if method == "timemean":
         t_rows = np.full(T, t_rows.mean())
         search_chans = CADENCE_SEARCH_MAX
-    # Start channel at t_ref, then the drift in channels rounded half-up like Stage 1. The 1e-3
-    # bias keeps exact halves rounding up despite the rounding of the stored drift rate;
-    # non-half values sit at least 1/(2*(T-1)) channel from a boundary.
+    # Start channel at t_ref, then the drift in channels rounded half-up like Stage 1. With the
+    # integer drift_bins and reference span carried from Stage 1 the drift is exact, so a tiny
+    # bias rounds exact halves up; the 0.001 Hz/s-rounded drift_rate_hz_s (signals without
+    # drift_bins, e.g. catalog known_rfi) needs a 1e-3 bias. Non-half values sit at least
+    # 1/(2*(T-1)) channel from a boundary (Codex review, bug 5).
     c_ref = int(np.rint((sig["peak_freq_mhz"] - freqs[0]) / df_mhz))
-    drift_ch = sig["drift_rate_hz_s"] * t_rows / (df_mhz * 1e6)
-    c_rows = c_ref + np.floor(drift_ch + 0.5 + 1e-3).astype(np.int64)
+    if "drift_bins" in sig and "ref_span_s" in sig:
+        rate_hz_s = sig["drift_bins"] * sig.get("ref_foff_hz", hdr["foff_hz"]) / sig["ref_span_s"]
+        bias = 1e-6
+    else:
+        rate_hz_s, bias = sig["drift_rate_hz_s"], 1e-3
+    drift_ch = rate_hz_s * t_rows / hdr["foff_hz"]
+    c_rows = c_ref + np.floor(drift_ch + 0.5 + bias).astype(np.int64)
 
     half = search_chans + 8 + CADENCE_BG_CHANS
     offs = np.arange(-half, half + 1)
@@ -926,11 +952,9 @@ def run_synthetic_cadence_benchmark(
         scans.append((data, freqs, hdr))
 
     stage1 = assess_arrays(scans[0], scans[1], tile_width=W, top_k=8)
-    signals = [
-        {"label": f"tile {c['tile_idx']}", "tile_idx": c["tile_idx"], "peak_freq_mhz": c["peak_freq_mhz"],
-         "drift_rate_hz_s": c["drift_rate_hz_s"], "t_ref_mjd": c["t_ref_mjd"], "drift_snr": c["drift_snr"]}
-        for c in stage1["candidates"]
-    ] + [stage1["negative_control"]]
+    signals = [cadence_signal(c) | {"label": f"tile {c['tile_idx']}"} for c in stage1["candidates"]] + [
+        stage1["negative_control"]
+    ]
     n = scans_used or len(scans)
     tested = cadence_test_signals(lambda i: scans[i], roles[:n], signals, method=method, tile_width=W, noise=noise)
     by_tile = {s["tile_idx"]: s for s in tested[:-1]}
