@@ -760,12 +760,14 @@ def drift_aligned_snr(
     offs = np.arange(-half, half + 1)
     idx = c_rows[:, None] + offs[None, :]
     inside = (idx >= 0) & (idx < N)
-    win = np.abs(offs) <= search_chans
-    if not inside[:, win].all():
-        return None
     vals = np.where(inside, z[np.arange(T)[:, None], np.clip(idx, 0, N - 1)], 0.0)
     n_in = inside.sum(axis=0)
     dd = vals.sum(axis=0) / np.sqrt(np.maximum(n_in, 1))
+    # Search only offsets whose whole track is in the band; unmeasured only if the
+    # predicted track itself leaves it (a carrier near the band edge is still measured).
+    win = (np.abs(offs) <= search_chans) & (n_in == T)
+    if n_in[half] < T:
+        return None
 
     if noise == "tile":
         start = c_rows[0] + offs  # start channel of each offset's track
