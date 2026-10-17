@@ -702,17 +702,19 @@ def run_noise_calibration_benchmark(calibrate: bool = True) -> dict:
 # Full-cadence test (ON/OFF/ON/OFF[/ON/OFF]) for Stage 1 candidates
 # ---------------------------------------------------------------------------
 CADENCE_PRESENT_SNR = OFF_DETECTION_SNR  # same "present" bar as the Stage 1 OFF veto
-CADENCE_SEARCH_BASE = 6                  # +/- channels searched around the predicted track
+CADENCE_SEARCH_BASE = 2                  # +/- channels searched around the predicted track
 CADENCE_SEARCH_MAX = 40
 CADENCE_BG_CHANS = 400                   # offsets beyond the search window used for the noise floor
 SNR_AGREEMENT_TOL = 0.1                  # cadence vs Stage 1 SNR in the scan Stage 1 scored
 CADENCE_VERDICTS = ("PASSES", "ONE-OFF", "PARTIAL", "RFI", "INCOMPLETE", "NOT-RECOVERED", "UNTESTED")
 
 
-def cadence_search_chans(dt_s: float, track_span: float) -> int:
-    """Stage 1 quantizes drift to whole bins per scan, so the predicted position drifts off
-    by up to ~1 channel per scan length of elapsed time. Widen the window to match."""
-    return int(min(CADENCE_SEARCH_MAX, CADENCE_SEARCH_BASE + math.ceil(abs(dt_s) / track_span)))
+def cadence_search_chans(dt_s: float, ref_span: float) -> int:
+    """Stage 1 quantizes drift to whole bins per track span of its own scan (ref_span), so
+    the predicted position drifts off by <= 1/2 channel per ref_span of elapsed time (1 if
+    Stage 1 picked a neighboring bin). The window allows that and no more: a wider one lets
+    an unrelated nearby carrier stand in for the candidate (Codex review, bug 2)."""
+    return int(min(CADENCE_SEARCH_MAX, CADENCE_SEARCH_BASE + math.ceil(abs(dt_s) / ref_span)))
 
 
 def drift_aligned_snr(
@@ -846,8 +848,10 @@ def cadence_test_signals(
         span = track_span_s(hdr, z.shape[0])
         for j, sig in enumerate(signals):
             dt = (hdr["tstart_mjd"] - sig["t_ref_mjd"]) * 86400.0 + 0.5 * span
-            m = drift_aligned_snr(z, freqs, hdr, sig, cadence_search_chans(dt, span), method=method,
-                                  noise=noise, tile_width=tile_width)
+            # error bound at this scan's last row, in units of the reference scan's track span
+            dt_last = dt + 0.5 * span
+            search = cadence_search_chans(dt_last, sig.get("ref_span_s", span))
+            m = drift_aligned_snr(z, freqs, hdr, sig, search, method=method, noise=noise, tile_width=tile_width)
             rows[j].append({
                 "scan": i, "role": role, "dt_s": round(dt, 1),
                 "snr": None if m is None else round(m["snr"], 2),
