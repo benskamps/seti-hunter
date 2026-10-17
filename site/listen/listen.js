@@ -121,7 +121,7 @@
         snap: null, source: 'none', reason: null,
         figures: [], items: [], view: [],
         filter: null, query: '', shown: PAGE, ledger: -1,
-        searched: new Set(), loadedAt: 0,
+        published: new Set(), ledger: {}, base: '', loadedAt: 0,
     };
 
     /* ------------------------------------------------------------ loading */
@@ -160,6 +160,34 @@
         } catch (e) { return []; }
     }
 
+    // The Ledger's index: {star: {file, count}} for every star whose list is public.
+    async function loadLedgerIndex(source) {
+        const base = source === 'demo' ? 'demo/' : '';
+        try {
+            const idx = await getJSON(`${base}ledger/index.json`);
+            if (!idx || typeof idx !== 'object' || Array.isArray(idx)) return {};
+            const out = {};
+            for (const [star, v] of Object.entries(idx)) {
+                if (v && typeof v.file === 'string' && /^ledger\/[A-Za-z0-9_-]+\.json$/.test(v.file) && Number.isInteger(v.count)) out[star] = v;
+            }
+            return out;
+        } catch (e) { return {}; }
+    }
+
+    // One star's whole list, loaded when someone types its full name into "find a star".
+    async function loadShard(star) {
+        const entry = state.ledger[star];
+        if (!entry || entry.loaded) return;
+        entry.loaded = true;
+        try {
+            const arr = await getJSON(`${state.base}${entry.file}`);
+            if (!Array.isArray(arr)) return;
+            state.figures = state.figures.concat(arr.filter(validItem).map((it) => ({ ...it, base: state.base })));
+            state.items = mergeItems(state.figures, state.snap);
+            renderChips(); renderWall(); renderSpectrum();
+        } catch (e) { entry.loaded = false; }
+    }
+
     // Wall/ribbon items: the daily figures (with cutouts and scans) plus any newer live
     // eliminations from the snapshot (their cutouts arrive with the next daily export).
     function mergeItems(figures, snap) {
@@ -173,14 +201,13 @@
             || String(a.id).localeCompare(String(b.id)));
     }
 
-    function parseSearched(hex) {
+    // Sample indices of the stars with published eliminations. Only public lists light
+    // the map: a per-star "searched" set would mark held stars by their absence (C1).
+    function publishedStars() {
+        const names = new Set([...Object.keys(state.ledger), ...state.items.map((it) => it.star)]);
         const set = new Set();
-        if (typeof hex !== 'string' || !/^[0-9a-f]+$/.test(hex) || !STARS) return set;
-        for (let i = 0; i < STARS.stars.length; i++) {
-            const pos = hex.length - 1 - (i >> 2);
-            if (pos < 0) break;
-            if ((parseInt(hex[pos], 16) >> (i & 3)) & 1) set.add(i);
-        }
+        if (!STARS) return set;
+        STARS.stars.forEach((s, i) => { if (names.has(s[0])) set.add(i); });
         return set;
     }
 
@@ -189,8 +216,9 @@
         const s = state.snap;
         if (!s) return { mode: 'demo', status: 'demo', text: 'No numbers yet: the survey hasn’t published, and the demo didn’t load' };
         if (state.source === 'demo') {
+            const why = state.reason === 'not-configured' ? 'DEMO DATA: THE RUN HASN’T STARTED' : 'LIVE NUMBERS UNREACHABLE RIGHT NOW';
             return { mode: 'demo', status: 'demo',
-                text: `DEMO DATA: THE RUN HASN’T STARTED · REAL SIGNALS FROM THE ${fmt(s.progress.cadences_total)}-TARGET PILOT, NOT THE SURVEY` };
+                text: `${why} · REAL SIGNALS FROM THE ${fmt(s.progress.cadences_total)}-TARGET PILOT, NOT THE SURVEY` };
         }
         const t = Date.parse(s.as_of_utc);
         const age = Date.now() - t;
@@ -210,7 +238,8 @@
         const status = $('[data-slot="status"]');
         status.dataset.state = m.status;
         $('[data-slot="status-text"]').textContent = m.status === 'live' ? `live · as of ${utcStamp(state.snap.as_of_utc)}`
-            : m.status === 'stale' ? `stale · showing the last good numbers` : 'demo · the run hasn’t started';
+            : m.status === 'stale' ? `stale · showing the last good numbers`
+                : state.reason === 'not-configured' ? 'demo · the run hasn’t started' : 'demo · live numbers unreachable';
         const s = state.snap;
         const withFig = state.items.filter((it) => it.tile).length;
         setBadge($('[data-slot="badge-wall"]'), m.mode, state.source === 'demo'
@@ -416,8 +445,8 @@
             }
             g.globalCompositeOperation = 'source-over';
             if (!sky.playing) {
-                // searched so far: a gold ring with a hot core (brightness is a reading)
-                for (const i of state.searched) {
+                // stars with published eliminations: a gold ring with a hot core (brightness is a reading)
+                for (const i of state.published) {
                     const p = pts[i]; if (!p) continue;
                     g.strokeStyle = 'rgba(255,209,102,.85)'; g.lineWidth = 1.3; g.beginPath(); g.arc(p.x, p.y, 4.6, 0, 7); g.stroke();
                     g.fillStyle = '#ffe6a3'; g.beginPath(); g.arc(p.x, p.y, 1.8, 0, 7); g.fill();
@@ -447,7 +476,7 @@
         };
         function skyHud() {
             if (sky.playing) return;
-            $('[data-slot="sky-date"]').textContent = state.snap ? `${fmt(state.searched.size)} searched` : '2016–2019';
+            $('[data-slot="sky-date"]').textContent = state.snap ? `${fmt(state.published.size)} with published eliminations` : '2016–2019';
             $('[data-slot="sky-count"]').textContent = `of ${fmt(pts.length)} stars in the sample`;
             const note = $('[data-slot="sky-note"]');
             note.textContent = `Hammer–Aitoff projection, equatorial coordinates, right ascension increasing to the left. ${fmt(pts.length)} stars from ${STARS.sample}. Hover or tap a star for its name.`
@@ -472,7 +501,7 @@
             const d = mjdDate(best.m);
             tip.textContent = '';
             tip.append(el('b', { text: best.n }), el('span', { text: `${bandTxt} · first observed ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}` }),
-                el('span', { text: state.searched.has(best.i) ? 'searched by this survey ✓' : 'not searched yet' }));
+                state.published.has(best.i) ? el('span', { text: 'eliminations published ✓' }) : null);
             showTip(e.clientX, e.clientY);
         }
         cv.addEventListener('pointermove', pick);
@@ -496,7 +525,8 @@
         // 1.1-2.8 GHz, widened in 100 MHz steps if any eliminated signal sits outside it
         // (the L-band files reach below 1.1 GHz), so every signal on the Wall has its pin.
         const freqs = state.items.map((it) => num(it.peak_freq_mhz)).filter((v) => v !== null);
-        const lo = Math.min(...freqs, 1100), hi = Math.max(...freqs, 2800);
+        let lo = 1100, hi = 2800;
+        for (const f of freqs) { if (f < lo) lo = f; if (f > hi) hi = f; }
         const F0 = lo < 1100 ? Math.floor((lo - 10) / 100) * 100 : 1100;
         const F1 = hi > 2800 ? Math.ceil((hi + 10) / 100) * 100 : 2800;
         const X0 = 40, X1 = 1160, BASE = 222, NB = Math.round((F1 - F0) / 10);
@@ -547,7 +577,7 @@
             if (t) sv('text', { x: X(f) + 3, y: 98, fill: '#7dd3fc', 'font-size': 10, text: t }, svg);
         }
         const items = state.items.filter((it) => num(it.peak_freq_mhz) !== null && it.peak_freq_mhz >= F0 && it.peak_freq_mhz <= F1);
-        // the ridge: every eliminated signal, counted per 10 MHz (height ~ sqrt(count))
+        // the ridge: every listed elimination on the page, counted per 10 MHz (height ~ sqrt(count))
         const bins = new Array(NB).fill(0);
         for (const it of items) bins[Math.min(NB - 1, Math.floor((it.peak_freq_mhz - F0) / 10))] += 1;
         const peak = Math.max(1, ...bins);
@@ -589,7 +619,7 @@
         const note = $('[data-slot="band-note"]');
         note.textContent = `Human-transmitter bands: ${STARS.bands_source === 'ladder.yaml' ? 'read from the frozen ladder.yaml' : 'the ladder’s initial list (ladder.yaml not frozen yet)'}. `
             + (F0 < 1100 ? `The axis starts at ${(F0 / 1000).toFixed(1)} GHz so the ${fmt(items.filter((it) => it.peak_freq_mhz < 1100).length)} signals found below 1.1 GHz keep their pins. ` : '')
-            + `The teal ridge counts every eliminated signal per 10 MHz (height grows with the square root of the count); pins mark the ${fmt(pins.length)} weirdest. H I and OH lines are drawn as a guide, never as data.`;
+            + `The teal ridge counts the ${fmt(items.length)} listed eliminations on this page per 10 MHz (height grows with the square root of the count); pins mark the ${fmt(pins.length)} weirdest. H I and OH lines are drawn as a guide, never as data.`;
     }
 
     function renderCallouts(items) {
@@ -615,7 +645,7 @@
         const list = (ks) => (ks.length === 1 ? String(ks[0]) : `${ks.slice(0, -1).join(', ')} and ${ks[ks.length - 1]}`);
         const water = items.filter((it) => it.peak_freq_mhz >= 1420 && it.peak_freq_mhz <= 1720).length;
         host.appendChild(el('div', { class: 'co' }, el('span', { class: 'big', text: `${fmt(hits.length)} of ${fmt(n)}` }),
-            'eliminated signals sit inside a ', el('b', { text: 'known human transmitter band' }),
+            'listed eliminations sit inside a ', el('b', { text: 'known human transmitter band' }),
             !hits.length ? '. None so far.'
                 : bandLead ? `, most of them in ${bandName(bandLead[0])} (${fmt(bandLead[1])}).`
                     : `, spread evenly across ${fmt(bandCounts.length)} bands.`));
@@ -839,7 +869,8 @@
         g.clearRect(0, 0, w, h);
         g.font = `${11 * dpr}px "JetBrains Mono", monospace`;
         if (series.length < 2) { g.fillStyle = '#8aa3b5'; g.fillText('no downloads logged yet', 8 * dpr, h / 2 + 4 * dpr); return; }
-        const lo = Math.min(...series), hi = Math.max(...series);
+        let lo = Infinity, hi = -Infinity;
+        for (const v of series) { if (v < lo) lo = v; if (v > hi) hi = v; }
         const pad = Math.max(0.05, (hi - lo) * 0.25), y0 = lo - pad, y1 = hi + pad;
         const X = (i) => 6 * dpr + i / (series.length - 1) * (w - 120 * dpr), Y = (v) => h - 6 * dpr - (v - y0) / (y1 - y0) * (h - 12 * dpr);
         g.strokeStyle = '#1d2838'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(0), Y(lo)); g.lineTo(X(series.length - 1), Y(lo)); g.moveTo(X(0), Y(hi)); g.lineTo(X(series.length - 1), Y(hi)); g.stroke();
@@ -869,7 +900,12 @@
         update();
         $('[data-action="more"]').addEventListener('click', () => { state.shown += PAGE; renderWall(); });
         const find = $('[data-slot="find"]');
-        find.addEventListener('input', () => { state.query = find.value; state.shown = PAGE; renderWall(); });
+        find.addEventListener('input', () => {
+            state.query = find.value; state.shown = PAGE; renderWall();
+            const q = find.value.trim().toLowerCase();
+            const star = Object.keys(state.ledger).find((k) => k.toLowerCase() === q);
+            if (star) loadShard(star);
+        });
         // the fingerprint guides in "how to read" (drawn as a guide, not data)
         for (const host of $$('.fp-bars')) {
             host.append(el('span', { class: 'thr' }), ...host.dataset.fp.split(',').map((v, i) => el('i', { class: i % 2 ? 'off' : 'on', style: { height: `${v}px` } })));
@@ -886,9 +922,10 @@
         if (!first && got.source === 'demo' && state.source !== 'demo' && state.snap) return; // keep the last good live numbers
         const changedSource = got.source !== state.source;
         state.snap = got.snap; state.source = got.source; state.reason = got.reason; state.loadedAt = Date.now();
-        state.searched = parseSearched(got.snap && got.snap.progress.searched);
-        if (first || changedSource) state.figures = await loadFigures(got.source);
+        state.base = got.source === 'demo' ? 'demo/' : '';
+        if (first || changedSource) { state.figures = await loadFigures(got.source); state.ledger = await loadLedgerIndex(got.source); }
         state.items = mergeItems(state.figures, state.snap);
+        state.published = publishedStars();
         renderAll();
     }
     async function boot() {
@@ -899,17 +936,17 @@
         initChrome(); initLedger(); initSky();
         await refresh(true);
         const m = window.location.hash.match(/^#signal=(.+)$/);
-        if (m) openLedgerById(decodeURIComponent(m[1]));
+        if (m) { try { openLedgerById(decodeURIComponent(m[1])); } catch (e) { /* a malformed link opens nothing */ } }
         setInterval(() => { if (!document.hidden) refresh(false); }, POLL_MS);
         // the badge's "as of" ages while the tab sits open: re-judge staleness each minute
         setInterval(() => { if (!document.hidden && state.snap) renderBadges(); }, 60000);
-        console.log('%c● listening %c seti-hunter · 1,133 stars · eliminated, never hidden', 'color:#7fe0d0;font-weight:700', 'color:#c9a86a');
+        console.log('%c● listening %c seti-hunter · 1,133 stars · eliminations are never hidden', 'color:#7fe0d0;font-weight:700', 'color:#c9a86a');
     }
 
     // For checks and for the curious: the page's state as text.
     window.render_state_to_text = () => JSON.stringify({
         source: state.source, reason: state.reason, badge: modeInfo().text, as_of_utc: state.snap && state.snap.as_of_utc,
-        funnel: state.snap && state.snap.funnel, items: state.items.length, searched: state.searched.size,
+        funnel: state.snap && state.snap.funnel, items: state.items.length, published_stars: state.published.size,
         reduced_motion: REDUCE, frames: window.__listenFrames,
     });
 

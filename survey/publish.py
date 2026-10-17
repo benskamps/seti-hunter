@@ -32,8 +32,12 @@ def _iso(t: datetime) -> str:
 
 
 def _log(db: sqlite3.Connection, now_utc: datetime, kind: str, detail: str) -> None:
-    db.execute("INSERT INTO events(utc, kind, detail) VALUES (?,?,?)", (_iso(now_utc), kind, detail[:500]))
-    db.commit()
+    # Logging must not be the thing that stops the survey (a locked or read-only db).
+    try:
+        db.execute("INSERT INTO events(utc, kind, detail) VALUES (?,?,?)", (_iso(now_utc), kind, detail[:500]))
+        db.commit()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def read_gist_id(path=GIST_ID_FILE) -> str | None:
@@ -48,15 +52,48 @@ def read_gist_id(path=GIST_ID_FILE) -> str | None:
 
 
 def _last_publish(db: sqlite3.Connection) -> datetime | None:
-    row = db.execute("SELECT MAX(utc) FROM events WHERE kind='publish'").fetchone()
-    if not row or not row[0]:
+    """The last successful publish, or None (also when the stored time is unreadable)."""
+    try:
+        row = db.execute("SELECT MAX(utc) FROM events WHERE kind='publish'").fetchone()
+        if not row or not row[0]:
+            return None
+        t = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
+        return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+    except Exception:  # noqa: BLE001
         return None
-    return datetime.fromisoformat(row[0].replace("Z", "+00:00"))
 
 
 def maybe_publish(db: sqlite3.Connection, gist_id: str, now_utc: datetime, min_interval_s: int = 900,
                   runner=subprocess.run, **snapshot_kw) -> bool:
-    """Publish the snapshot if `min_interval_s` has passed since the last publish. True iff published."""
+    """Publish the snapshot if `min_interval_s` has passed since the last publish. True iff published.
+
+    Never raises: every failure is logged to `events` (when the db allows) and returns False.
+    """
+    try:
+        return _maybe_publish(db, gist_id, now_utc, min_interval_s, runner, **snapshot_kw)
+    except Exception as exc:  # noqa: BLE001 - the survey must keep running whatever happens here
+        _log(db, now_utc, "publish_failed", f"publish: {type(exc).__name__}: {exc}")
+        return False
+
+
+def publish_if_configured(db: sqlite3.Connection, now_utc: datetime, *, gist_file=GIST_ID_FILE,
+                          runner=subprocess.run, **snapshot_kw) -> bool:
+    """The runner's one-line hook after each cadence. Never raises.
+
+    No gist yet (Ben creates it at go-live) -> False quietly; an unreadable gist id
+    file -> False with a publish_failed event.
+    """
+    try:
+        gid = read_gist_id(gist_file)
+    except Exception as exc:  # noqa: BLE001
+        _log(db, now_utc, "publish_failed", f"gist id: {type(exc).__name__}: {exc}")
+        return False
+    if gid is None:
+        return False
+    return maybe_publish(db, gid, now_utc, runner=runner, **snapshot_kw)
+
+
+def _maybe_publish(db, gist_id, now_utc, min_interval_s, runner, **snapshot_kw) -> bool:
     last = _last_publish(db)
     if last is not None:
         elapsed = (now_utc - last).total_seconds()

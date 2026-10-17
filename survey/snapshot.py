@@ -12,7 +12,9 @@ Who is public, and when (spec §9 "What the public sees mid-run"):
 - Every other signal (its star still has a cadence to run, or something pending
   or under review) counts only from the 00:00 UTC batch: it is counted iff it
   was created before the latest 00:00 UTC boundary at or before `now`. Its row
-  is never listed.
+  is not listed.
+- After the run ends (every cadence finished, no PENDING_R5 left) every
+  finished star is settled; SURVIVOR rows are still never listed, only counted.
 
 So the pending count, and anything about a star with a pending signal, moves
 once per UTC day and never mid-day. That holds as long as the runner registers
@@ -86,14 +88,31 @@ def batch_boundary(now_utc: datetime) -> datetime:
     return now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
+def run_ended(db: sqlite3.Connection) -> bool:
+    """Every cadence finished and rung 5's final pass done (no PENDING_R5 left)."""
+    marks = ",".join("?" * len(FINISHED))
+    n_all, n_done = db.execute(f"SELECT COUNT(*), COALESCE(SUM(status IN ({marks})),0) FROM cadences", FINISHED).fetchone()
+    pending = db.execute("SELECT COUNT(*) FROM signals WHERE COALESCE(planted,0)=0 AND verdict='PENDING_R5'").fetchone()[0]
+    return bool(n_all) and n_done == n_all and pending == 0
+
+
 def settled_stars(db: sqlite3.Connection) -> tuple[set[str], set[str]]:
-    """(stars with every cadence finished, stars that are also free of held signals)."""
+    """(stars with every cadence finished, stars whose eliminations may be listed).
+
+    While the run goes, a star is listed once it is finished and holds nothing
+    pending or under review. After the run ends (spec §9: "or after the run
+    ends") every finished star is listed; a SURVIVOR row itself never is, only
+    its count. Without that clause the Ledger's gaps would name the survivors'
+    stars once finalize had cleared everyone else.
+    """
     finished = set()
     marks = ",".join("?" * len(FINISHED))
     for star, n_all, n_done in db.execute(
             f"SELECT star, COUNT(*), SUM(status IN ({marks})) FROM cadences GROUP BY star", FINISHED):
         if n_all and n_done == n_all:
             finished.add(star)
+    if run_ended(db):
+        return finished, set(finished)
     held = {r[0] for r in db.execute(
         f"SELECT DISTINCT star FROM signals WHERE COALESCE(planted,0)=0 AND verdict IN ({','.join('?' * len(HELD_VERDICTS))})",
         HELD_VERDICTS)}
@@ -153,10 +172,9 @@ def _progress(db, finished, sample) -> dict:
     hb = db.execute("SELECT bytes_total FROM heartbeat WHERE id=1").fetchone()
     nbytes = hb[0] if hb and hb[0] is not None else (
         db.execute("SELECT COALESCE(SUM(bytes),0) FROM cadences WHERE status='scored'").fetchone()[0])
-    bits = 0
-    for i, name in enumerate(sample):
-        if name in finished:
-            bits |= 1 << i
+    # No per-star list here. A "searched" bitmap over the (public) sample order
+    # would name every finished star, and finished-but-unlisted = holding a
+    # pending or survivor signal (review finding C1).
     return {
         "stars_total": len(sample),
         "stars_done": len(finished),
@@ -165,8 +183,6 @@ def _progress(db, finished, sample) -> dict:
         "cadences_parked": status.get("parked", 0),
         "cadences_incomplete": status.get("incomplete", 0),
         "bytes_streamed": int(nbytes or 0),
-        # bit i set = star i of the sample (CSV order) has every cadence finished
-        "searched": format(bits, "x"),
     }
 
 

@@ -216,9 +216,10 @@ def test_progress_and_heartbeat(db):
     assert p["cadences_parked"] == 1
     assert p["cadences_incomplete"] == 1
     assert p["stars_done"] == 4  # every star except the queued one
-    # searched: hex bitmap over sample order; bit i set = star i finished.
-    bits = int(p["searched"], 16)
-    assert [bool(bits >> i & 1) for i in range(len(fx.SAMPLE))] == [True, True, True, True, False]
+    # No per-star "searched" list: with the sample order public in stars.js it
+    # named every finished star, and finished-but-unlisted = holding a pending
+    # or survivor signal (review finding C1).
+    assert "searched" not in p
     assert p["bytes_streamed"] == 5_812_000_000
     assert s["heartbeat"] == {"star": fx.STAR_LIVE, "scan_idx": 3, "speed_mb_s": 1.31,
                               "updated_utc": "2026-10-17T11:50:00Z"}
@@ -235,3 +236,41 @@ def test_progress_and_heartbeat(db):
 def test_stars_total_defaults_to_the_sample_file(db):
     s = build_snapshot(db, NOW, sample_path="tests/fixtures/gbt_sample_price2020.csv")
     assert s["progress"]["stars_total"] == 1133
+
+
+def finalize_with_one_survivor(db):
+    """The run ends: every cadence finished, rung 5's final pass eliminates the pending signal.
+
+    The fixture's SURVIVOR on STAR_SURVIVOR stays a survivor.
+    """
+    db.execute("UPDATE cadences SET status='scored' WHERE status='queued'")
+    db.execute("UPDATE signals SET verdict='ELIMINATED', rung=5, reason='also seen at GJ411', "
+               "decided_utc='2026-11-30T09:00:00Z' WHERE id=?", (fx.PENDING_ID,))
+    db.commit()
+
+
+def test_after_the_run_ends_every_finished_star_is_listed_but_survivors_never(db):
+    """Spec §9: the Ledger lists a star once it has nothing pending, *or after the run ends*.
+
+    Without the second clause, after finalize the only finished stars still
+    missing from the Ledger would be the survivors' stars: the list's gap would
+    name them (review finding C1).
+    """
+    finalize_with_one_survivor(db)
+    s = snap(db, utc(2026, 11, 30, 9, 5))
+    listed = {r["star"] for r in s["recent_eliminated"]}
+    assert fx.STAR_SURVIVOR in listed  # its eliminated comb row is public
+    raw = serialize(s).decode("utf-8")
+    for needle in (fx.SURVIVOR_ID, f"{fx.SURVIVOR_FREQ:.3f}"):
+        assert needle not in raw
+    assert s["funnel"]["under_review"] == 1
+    assert s["funnel"]["pending_final_check"] == 0
+    assert funnel_total(s["funnel"]) == s["funnel"]["flagged"]
+
+
+def test_while_the_run_goes_a_star_with_a_survivor_stays_unlisted(db):
+    # One cadence still queued: the run hasn't ended, so the held stars stay held.
+    db.execute("UPDATE signals SET verdict='ELIMINATED', rung=5 WHERE id=?", (fx.PENDING_ID,))
+    db.commit()
+    s = snap(db)
+    assert fx.STAR_SURVIVOR not in {r["star"] for r in s["recent_eliminated"]}

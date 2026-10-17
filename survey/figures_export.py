@@ -1,17 +1,23 @@
 """Daily export of eliminated-signal figures for the Weird Wall and the Ledger (spec §9).
 
-Writes, for every ELIMINATED, non-planted signal of a *settled* star (see
-survey.snapshot: every cadence finished, nothing pending or under review):
+Every ELIMINATED, non-planted signal of a *listed* star (see survey.snapshot:
+finished and holding nothing pending or under review, or any finished star
+once the run has ended) is published, in two layers sized for a survey that
+may flag 10^4-10^5 signals:
 
-    <out_dir>/{id}.webp       the full three-panel figure, <= FULL_MAX_BYTES
-    <out_dir>/{id}_on.webp    the ON-panel crop for Wall tiles, TILE_SIZE, <= TILE_MAX_BYTES
-    <out_dir>/../figures.json one whitelisted item per signal, sorted by (star, peak_freq_mhz, id)
+    <out_dir>/../figures.json         the Wall: the `max_figures` weirdest, whitelisted items
+    <out_dir>/{id}.webp               their full three-panel figures, <= FULL_MAX_BYTES
+    <out_dir>/{id}_on.webp            their ON-panel tiles, TILE_SIZE, <= TILE_MAX_BYTES
+    <out_dir>/../ledger/{slug}.json   the Ledger: every listed signal of one star (images only for the capped few)
+    <out_dir>/../ledger/index.json    {star: {file, count}} for the page's "find a star"
 
-Any {id}.webp / {id}_on.webp in out_dir that is no longer eligible is deleted,
-so a star that gains a pending signal drops off the Wall at the next export.
-Same database + same source figures -> byte-identical output.
+Images and Wall entries are capped because they go into a public repo's
+permanent history (~66 KB of webp per signal). Anything no longer eligible
+(images, shards) is deleted, so a star that gains a pending signal leaves the
+Wall and the Ledger at the next export. Same database + same source figures ->
+byte-identical output.
 
-    python -m survey.figures_export [--db PATH] [--out site/listen/figures]
+    python -m survey.figures_export [--db PATH] [--out site/listen/figures] [--max-figures N]
 """
 from __future__ import annotations
 
@@ -37,6 +43,7 @@ ON_CROP = (97, 82, 540, 424)
 DEFAULT_SRC = Path(r"E:\seti_staging\results\figures")
 DEFAULT_DB = Path(r"E:\seti_staging\state\survey.sqlite")
 
+MAX_FIGURES = 400  # Wall entries with images: ~26 MB of webp at the cap
 QUALITIES = (82, 70, 58, 46, 34, 22, 12)
 FULL_SCALES = (1.0, 0.85, 0.7, 0.55, 0.4)
 OURS = re.compile(r"^(?P<id>.+?)(?P<on>_on)?\.webp$")
@@ -85,29 +92,42 @@ def _source(figure_col: str | None, sid: str, src_dir: Path) -> Path | None:
     return None
 
 
-def export(db: sqlite3.Connection, out_dir="site/listen/figures", now_utc: datetime | None = None,
-           *, src_dir=DEFAULT_SRC) -> dict:
-    """Write the Wall/Ledger figures and figures.json. Returns counts.
+def _slug(star: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "_", star)
 
-    `now_utc` is accepted for the daily commit message and future use; eligibility
-    depends only on the database (figures publish daily, behind the live counts).
+
+def _dump(obj) -> bytes:
+    return (json.dumps(obj, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+
+
+def _order(it):
+    return (it["star"], it["peak_freq_mhz"] if it["peak_freq_mhz"] is not None else -1, it["id"])
+
+
+def export(db: sqlite3.Connection, out_dir="site/listen/figures", now_utc: datetime | None = None,
+           *, src_dir=DEFAULT_SRC, max_figures: int = MAX_FIGURES) -> dict:
+    """Write the Wall (figures.json + capped images) and the per-star Ledger shards. Returns counts.
+
+    `now_utc` is accepted for the daily commit message; eligibility depends only
+    on the database (figures publish daily, behind the live counts).
     """
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    ledger_dir = out.parent / "ledger"
+    ledger_dir.mkdir(parents=True, exist_ok=True)
     src_dir = Path(src_dir)
-    _, settled = settled_stars(db)
+    _, listed = settled_stars(db)
     rows = []
-    if settled:
-        marks = ",".join("?" * len(settled))
+    if listed:
+        marks = ",".join("?" * len(listed))
         rows = db.execute(
             "SELECT id, star, band, shape, peak_freq_mhz, drift_rate_hz_s, rung, reason, weirdness, scans_json, "
             f"decided_utc, figure FROM signals WHERE verdict='ELIMINATED' AND COALESCE(planted,0)=0 "
-            f"AND star IN ({marks})", sorted(settled)).fetchall()
+            f"AND star IN ({marks})", sorted(listed)).fetchall()
 
-    items, keep, missing, written = [], set(), 0, 0
+    items, sources = [], {}
     for (sid, star, band, shape, f, drift, rung, reason, weird, scans_json, decided, fig_col) in rows:
-        src = _source(fig_col, sid, src_dir)
-        item = {
+        items.append({
             "id": sid, "star": star, "band": band, "shape": shape,
             "peak_freq_mhz": None if f is None else round(float(f), 6),
             "drift_rate_hz_s": None if drift is None else round(float(drift), 3),
@@ -115,23 +135,30 @@ def export(db: sqlite3.Connection, out_dir="site/listen/figures", now_utc: datet
             "weirdness": None if weird is None else round(float(weird), 3),
             "scans": _scans(scans_json), "decided_utc": decided,
             "figure": None, "tile": None,
-        }
+        })
+        sources[sid] = fig_col
+
+    # The Wall: the weirdest `max_figures`, ties broken by id so the cut is deterministic.
+    wall = sorted(items, key=lambda it: (-(it["weirdness"] if it["weirdness"] is not None else float("-inf")), it["id"]))[:max_figures]
+    keep, missing, written = set(), 0, 0
+    for item in wall:
+        sid = item["id"]
+        src = _source(sources[sid], sid, src_dir)
         if src is None:
             missing += 1
-        else:
-            full_p, tile_p = out / f"{sid}.webp", out / f"{sid}_on.webp"
-            stale = not (full_p.exists() and tile_p.exists()) or min(
-                full_p.stat().st_mtime, tile_p.stat().st_mtime) < src.stat().st_mtime
-            if stale:
-                with Image.open(src) as im:
-                    im = im.convert("RGB")
-                    _write_if_changed(full_p, _encode(im, FULL_MAX_BYTES, FULL_SCALES))
-                    _write_if_changed(tile_p, _encode(_on_crop(im), TILE_MAX_BYTES))
-                written += 1
-            keep.update({full_p.name, tile_p.name})
-            item["figure"] = f"figures/{full_p.name}"
-            item["tile"] = f"figures/{tile_p.name}"
-        items.append(item)
+            continue
+        full_p, tile_p = out / f"{sid}.webp", out / f"{sid}_on.webp"
+        stale = not (full_p.exists() and tile_p.exists()) or min(
+            full_p.stat().st_mtime, tile_p.stat().st_mtime) < src.stat().st_mtime
+        if stale:
+            with Image.open(src) as im:
+                im = im.convert("RGB")
+                _write_if_changed(full_p, _encode(im, FULL_MAX_BYTES, FULL_SCALES))
+                _write_if_changed(tile_p, _encode(_on_crop(im), TILE_MAX_BYTES))
+            written += 1
+        keep.update({full_p.name, tile_p.name})
+        item["figure"] = f"figures/{full_p.name}"
+        item["tile"] = f"figures/{tile_p.name}"
 
     removed = 0
     for p in out.iterdir():
@@ -139,11 +166,24 @@ def export(db: sqlite3.Connection, out_dir="site/listen/figures", now_utc: datet
             p.unlink()
             removed += 1
 
-    items.sort(key=lambda it: (it["star"], it["peak_freq_mhz"] if it["peak_freq_mhz"] is not None else -1, it["id"]))
-    data = (json.dumps(items, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
-    _write_if_changed(out.parent / "figures.json", data)
-    return {"signals": len(items), "figures": len(keep) // 2, "written": written, "missing": missing,
-            "removed": removed}
+    _write_if_changed(out.parent / "figures.json", _dump(sorted(wall, key=_order)))
+
+    # The Ledger: one shard per listed star with every one of its listed signals.
+    by_star: dict[str, list] = {}
+    for it in items:
+        by_star.setdefault(it["star"], []).append(it)
+    index, shards = {}, set()
+    for star in sorted(by_star):
+        name = f"{_slug(star)}.json"
+        shards.add(name)
+        _write_if_changed(ledger_dir / name, _dump(sorted(by_star[star], key=_order)))
+        index[star] = {"file": f"ledger/{name}", "count": len(by_star[star])}
+    for p in ledger_dir.iterdir():
+        if p.is_file() and p.suffix == ".json" and p.name != "index.json" and p.name not in shards:
+            p.unlink()
+    _write_if_changed(ledger_dir / "index.json", _dump(index))
+    return {"signals": len(items), "wall": len(wall), "figures": len(keep) // 2, "written": written,
+            "missing": missing, "removed": removed, "stars": len(index)}
 
 
 def main(argv=None) -> int:
@@ -151,10 +191,11 @@ def main(argv=None) -> int:
     ap.add_argument("--db", default=str(DEFAULT_DB))
     ap.add_argument("--out", default="site/listen/figures")
     ap.add_argument("--src", default=str(DEFAULT_SRC))
+    ap.add_argument("--max-figures", type=int, default=MAX_FIGURES)
     a = ap.parse_args(argv)
     db = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
     try:
-        counts = export(db, a.out, datetime.now(timezone.utc), src_dir=a.src)
+        counts = export(db, a.out, datetime.now(timezone.utc), src_dir=a.src, max_figures=a.max_figures)
     finally:
         db.close()
     print(json.dumps(counts))

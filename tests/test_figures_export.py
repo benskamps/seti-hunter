@@ -128,3 +128,67 @@ def test_stale_files_removed(env):
     (out / "notes.txt").write_text("keep me")  # only our own .webp files are ever deleted
     run(db, out)
     assert (out / "notes.txt").exists()
+
+
+def test_after_the_run_ends_the_survivor_star_is_exported_without_its_survivor(env):
+    """Review Focus 3 on the export, plus spec §9's "or after the run ends"."""
+    db, out = env
+    db.execute("UPDATE cadences SET status='scored' WHERE status='queued'")
+    db.execute("UPDATE signals SET verdict='ELIMINATED', rung=5 WHERE id=?", (fx.PENDING_ID,))
+    db.commit()
+    run(db, out)
+    items = json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))
+    ids = {it["id"] for it in items}
+    assert fx.PENDING_ID in ids  # the pending star's list appears once its signal is eliminated
+    assert {it["star"] for it in items} == {fx.STAR_PUBLIC, fx.STAR_PENDING, fx.STAR_SURVIVOR}
+    assert fx.SURVIVOR_ID not in ids
+    raw = (out.parent / "figures.json").read_text(encoding="utf-8")
+    assert f"{fx.SURVIVOR_FREQ:.3f}" not in raw
+    assert not any(p.name.startswith(fx.SURVIVOR_ID) for p in out.iterdir())
+
+
+def add_many(db, src, n):
+    """n more eliminations on the public star, weirdness rising with i, each with a figure."""
+    for i in range(n):
+        sid = f"GJ411_S_57543.0102_weird_t{2000 + i:04d}"
+        p = src / f"{sid}.png"
+        write_source_figure(p, 500 + i)
+        fx.add_signal(db, sid, "GJ411_S_57543.0102", fx.STAR_PUBLIC, "S", "weird", 2000.0 + i, 1.0,
+                      "ELIMINATED", 1, fx.REASONS[1], weirdness=10.0 + i)
+        db.execute("UPDATE signals SET figure=? WHERE id=?", (str(p), sid))
+    db.commit()
+
+
+def test_published_figures_are_capped_to_the_weirdest(env, tmp_path):
+    db, out = env
+    add_many(db, tmp_path / "src", 12)
+    counts = export(db, out_dir=str(out), now_utc=NOW, max_figures=5)
+    items = json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))
+    assert len(items) == 5 and counts["figures"] == 5
+    assert {it["id"] for it in items} == {f"GJ411_S_57543.0102_weird_t{2000 + i:04d}" for i in range(7, 12)}
+    assert len(list(out.glob("*.webp"))) == 10  # full + tile for each of the five
+
+
+def test_the_ledger_shards_hold_every_listed_signal(env, tmp_path):
+    db, out = env
+    add_many(db, tmp_path / "src", 12)
+    export(db, out_dir=str(out), now_utc=NOW, max_figures=5)
+    index = json.loads((out.parent / "ledger" / "index.json").read_text(encoding="utf-8"))
+    assert index == {fx.STAR_PUBLIC: {"file": "ledger/GJ411.json", "count": 17}}
+    shard = json.loads((out.parent / "ledger" / "GJ411.json").read_text(encoding="utf-8"))
+    assert len(shard) == 17
+    with_fig = [it for it in shard if it["figure"]]
+    assert len(with_fig) == 5  # only the capped five carry images
+    assert all(it["star"] == fx.STAR_PUBLIC for it in shard)
+
+
+def test_a_withdrawn_star_loses_its_shard(env):
+    db, out = env
+    run(db, out)
+    assert (out.parent / "ledger" / "GJ411.json").exists()
+    fx.add_signal(db, "GJ411_S_57543.0102_weird_t0999", "GJ411_S_57543.0102", fx.STAR_PUBLIC, "S", "weird",
+                  2100.0, 1.0, "PENDING_R5")
+    db.commit()
+    run(db, out)
+    assert not (out.parent / "ledger" / "GJ411.json").exists()
+    assert json.loads((out.parent / "ledger" / "index.json").read_text(encoding="utf-8")) == {}

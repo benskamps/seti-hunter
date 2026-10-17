@@ -87,7 +87,7 @@
         <header class="sec-head">
             <p class="sec-num">01</p>
             <h2 id="h-read">Three ideas carry the page</h2>
-            <p class="blurb">Three ideas carry the whole page: how the telescope looks, what a real signal&rsquo;s fingerprint is, and the ladder every flagged signal climbs down.</p>
+            <p class="blurb">How the telescope looks, what a real signal&rsquo;s fingerprint is, and the ladder every flagged signal climbs down.</p>
         </header>
         <div class="read-grid">
             <article class="read-card">
@@ -143,7 +143,7 @@
             <div class="panel-badge"><span class="badge" data-slot="badge">&hellip;</span></div>
             <ul class="funnel" data-slot="funnel"></ul>
             <p class="funnel-sum" data-slot="funnel-sum"></p>
-            <p class="ruler">Bar length: share of all flagged signals (linear). &ldquo;Pending final check&rdquo; changes once a day, from the 00:00 UTC batch, so neither its jumps nor a gap in a star&rsquo;s list can point at one star.</p>
+            <p class="ruler">Bar length: share of all flagged signals (linear). &ldquo;Pending final check&rdquo; changes once a day, from the 00:00 UTC batch, so its jumps are a day&rsquo;s worth of stars at once. A star&rsquo;s eliminations are listed once nothing of it waits on rung 5, and every star&rsquo;s once the run ends.</p>
         </div>
     </section>
 
@@ -152,7 +152,7 @@
         <header class="sec-head">
             <p class="sec-num">03</p>
             <h2 id="h-sky">The sky we&rsquo;re listening to</h2>
-            <p class="blurb">Every dot is a real star from the sample, at its real position; the glowing band is the Milky Way. Stars the survey has finished light up gold. Replay plays the original 2016&ndash;2019 observing in the order the telescope visited them.</p>
+            <p class="blurb">Every dot is a real star from the sample, at its real position; the glowing band is the Milky Way. Stars whose eliminations are published light up gold. Replay plays the original 2016&ndash;2019 observing in the order the telescope visited them.</p>
         </header>
         <div class="glass sky-glass">
             <div class="glass-top">
@@ -167,7 +167,7 @@
                 <li><i class="sw sw-ls"></i>L- and S-band</li>
                 <li><i class="sw sw-l"></i>L-band only</li>
                 <li><i class="sw sw-s"></i>S-band only</li>
-                <li><i class="sw sw-done"></i>searched so far</li>
+                <li><i class="sw sw-done"></i>eliminations published</li>
             </ul>
             <p class="glass-note" data-slot="sky-note">Hammer&ndash;Aitoff projection, equatorial coordinates, right ascension increasing to the left. Hover or tap a star for its name.</p>
         </div>
@@ -204,7 +204,7 @@
         <p class="wall-badge"><span class="badge" data-slot="badge-wall">&hellip;</span></p>
         <div class="wall" data-slot="wall"></div>
         <p class="wall-more"><button type="button" class="btn" data-action="more" hidden>Show more</button></p>
-        <p class="caption">Figures update daily; numbers every ~15 minutes. The Wall and the Ledger can trail the Funnel by up to a day. A star&rsquo;s list appears only once nothing of it is still pending.</p>
+        <p class="caption">Figures update once a day; numbers every ~15 minutes, so the Wall and the Ledger trail the Funnel by about a day. The Wall shows the weirdest few hundred; type a star&rsquo;s full name to load its whole list. A star&rsquo;s list appears once nothing of it waits on rung 5, and every star&rsquo;s once the run ends.</p>
     </section>
 
     <!-- ============================================================ 08 · heartbeat -->
@@ -276,7 +276,7 @@
             <h3>Four things this page will never show</h3>
             <ul>
                 <li>A signal waiting on rung 5. Only a count, changed once a day.</li>
-                <li>A star&rsquo;s list while anything of it is still pending or under review.</li>
+                <li>A star&rsquo;s list while any of its signals still waits on rung 5.</li>
                 <li>The star, frequency or date of a signal under private review. Only the count, and the four-step tracker.</li>
                 <li>Anything the run&rsquo;s state file holds that isn&rsquo;t on the published contract. The survey redacts it, and the site&rsquo;s proxy redacts it again.</li>
             </ul>
@@ -327,7 +327,7 @@
             <p>Ben Schippers, independent researcher, Broken Branch. Built with Claude and Codex; the paper discloses it.</p>
         </div>
     </div>
-    <p class="contract">numbers from the run&rsquo;s state file &middot; redacted twice &middot; eliminated, never hidden</p>
+    <p class="contract">numbers from the run&rsquo;s state file &middot; redacted twice &middot; eliminations are never hidden</p>
     <p class="signoff">Strogies supervised from a sunbeam, as is tradition.</p>
 </section>
 

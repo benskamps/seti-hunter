@@ -45,8 +45,8 @@ async function open(browser, { width, height = 900, reduced = false, storage = n
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(`${BASE}/listen/`, { waitUntil: 'networkidle' });
-  await sleep(1800);
+  await page.goto(`${BASE}/listen/`, { waitUntil: 'load' });
+  await sleep(2600);
   return { ctx, page, errors };
 }
 
@@ -70,6 +70,15 @@ try {
     const html = await page.content();
     const leaked = [...PENDING, ...SURVIVOR].filter((n) => text.includes(n) || html.includes(n));
     check(`redaction @${width}`, leaked.length === 0 && text.includes('GJ411'), { leaked, publicStarShown: text.includes('GJ411') });
+    if (width === 1440) {
+      // Reason like an observer (review C1): nothing on the page may single out a held
+      // star by its absence. The map lights only stars whose eliminations are listed,
+      // so a held star and a never-flagged star look the same. The fixture's one listed
+      // star is GJ411; the snapshot carries no per-star "searched" list.
+      const st = JSON.parse(await page.evaluate(() => window.render_state_to_text()));
+      const snapKeys = await page.evaluate(() => fetch('/api/listen').then((r) => r.json()).then((s) => Object.keys(s.progress)));
+      check('observer: only listed stars light the map; no per-star progress list', st.published_stars === 1 && !snapKeys.includes('searched'), { published_stars: st.published_stars, progressKeys: snapKeys });
+    }
     const o = await overflow(page);
     check(`no-hscroll @${width}`, o.scrollWidth <= o.W && o.over.length === 0, o);
     check(`console clean (fixture) @${width}`, errors.length === 0, errors);
@@ -132,6 +141,26 @@ try {
     await page.screenshot({ path: `${OUT}/listen-demo-1440.png`, fullPage: true });
     await ctx.close();
   }
+  {
+    // a malformed share link must not throw (it used to stop the polling registered after it)
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto(`${BASE}/listen/#signal=%E0%A4%A`, { waitUntil: 'load' });
+    await sleep(1500);
+    const flagged = await page.locator('[data-count="flagged"]').textContent();
+    check('malformed #signal= link: no exception, page renders', errors.length === 0 && flagged === '24', { errors, flagged });
+    await ctx.close();
+  }
+  await mode('error');
+  {
+    const { ctx, page } = await open(browser, { width: 1440 });
+    const badge = await page.locator('[data-slot="badge"]').first().textContent();
+    check('unreachable gist + nothing cached -> says unreachable, not "hasn\'t started"', /^LIVE NUMBERS UNREACHABLE/.test(badge), { badge });
+    await ctx.close();
+  }
+  await mode('empty');
   {
     const { ctx, page, errors } = await open(browser, { width: 375 });
     const o = await overflow(page);
