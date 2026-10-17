@@ -2,9 +2,11 @@
 SETI Rolling-Buffer Survey & Observatory Dashboard Generator
 ============================================================
 Streams Breakthrough Listen cadences to E:\\seti_staging\\raw, runs the 5-axis
-Weirdness & ON/OFF Veto Engine across millions of channels, renders side-by-side
-ON vs OFF waterfall spectrograms, purges the raw multi-hundred-MB/GB files to
-keep disk footprint near zero, and builds an interactive HTML dashboard.
+Weirdness & ON/OFF Veto Engine across millions of channels on the first ON/OFF pair,
+then tests every candidate across the target's full ON/OFF cadence (cadence_check.py),
+renders side-by-side ON vs OFF waterfall spectrograms, purges the raw files to keep
+disk footprint near zero, and builds an interactive HTML dashboard whose badges are
+the cadence verdicts.
 """
 
 import os
@@ -20,8 +22,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from cadence_check import print_cadence_result, run_cadence_check
 from targets_catalog import STAGE1_CADENCES, STAGE2_FINE_RES_QUEUE
-from weirdness_engine import OFF_DETECTION_SNR, assess_cadence, run_synthetic_verification_benchmark
+from weirdness_engine import (
+    CADENCE_PRESENT_SNR,
+    OFF_DETECTION_SNR,
+    assess_cadence,
+    run_synthetic_cadence_benchmark,
+    run_synthetic_verification_benchmark,
+)
 
 STAGING_RAW_DIR = r"E:\seti_staging\raw"
 RESULTS_DIR = r"E:\seti_staging\results"
@@ -168,6 +177,25 @@ def render_candidate_plot(
     return plot_path, b64
 
 
+# Dashboard badge per cadence verdict (weirdness_engine.cadence_verdict). Only PASSES is green.
+VERDICT_BADGES = {
+    "PASSES": ("#10b981", "PASSES CADENCE"),
+    "ONE-OFF": ("#f97316", "ONE-OFF (ON_1 ONLY)"),
+    "PARTIAL": ("#eab308", "PARTIAL"),
+    "RFI": ("#f43f5e", "RFI (IN AN OFF SCAN)"),
+    "NOT-RECOVERED": ("#94a3b8", "NOT RECOVERED BY CADENCE CHECK"),
+    "UNTESTED": ("#94a3b8", "UNTESTED (NO OFF SCAN)"),
+}
+
+
+def scan_cell_html(row: dict) -> str:
+    """One cell of a candidate's per-scan strip: role and drift-aligned SNR, lit if present."""
+    snr = "&ndash;" if row["snr"] is None else f"{row['snr']:.1f}"
+    classes = "scan-cell" + (" scan-hit" if row["present"] else "") + (" scan-off" if row["role"] == "OFF" else "")
+    title = f"{row['label']}: peak offset {row['offset_ch']} ch, searched +/-{row['search_chans']} ch"
+    return f'<span class="{classes}" title="{title}">{row["role"]} {snr}</span>'
+
+
 def generate_html_dashboard(survey_report: dict, out_html_path: str):
     """Generates an interactive standalone HTML dashboard of all SETI weirdness findings."""
     bench = survey_report["benchmark"]
@@ -189,11 +217,12 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
 
     cards_html = []
     for rank, cand in enumerate(all_cands, 1):
-        is_sky = cand["off_peak_snr"] <= OFF_DETECTION_SNR
-        badge_color = "#10b981" if is_sky else "#f43f5e"
-        badge_text = "SKY-LOCALIZED (ON-EXCLUSIVE)" if is_sky else "RFI / OFF-PRESENT"
+        verdict = cand.get("cadence_verdict", "UNTESTED")
+        badge_color, badge_label = VERDICT_BADGES[verdict]
+        badge_text = f"{badge_label} &middot; {cand.get('cadence_detail', 'no cadence check')}"
+        scan_cells = "".join(scan_cell_html(r) for r in cand.get("cadence_scans", []))
         cards_html.append(f"""
-        <div class="card" data-sky="{'sky' if is_sky else 'rfi'}" data-target="{cand['cadence_id']}">
+        <div class="card" data-verdict="{verdict}" data-target="{cand['cadence_id']}">
             <div class="card-header">
                 <div>
                     <span class="rank-badge">#{rank}</span>
@@ -216,6 +245,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
                     <code>Drift:{cand['z_drift']:.1f} | Burst:{cand['z_burst']:.1f} | Curve:{cand['z_curvature']:.1f} | Morph:{cand['z_morphology']:.1f} | Manifold:{cand['z_manifold']:.1f}</code>
                 </div>
             </div>
+            <div class="scan-strip"><span class="scan-strip-label">Cadence, drift-aligned SNR per scan (lit = &ge; {CADENCE_PRESENT_SNR:.0f}):</span>{scan_cells or '<em>no cadence check</em>'}</div>
             <div class="plot-container">
                 <img src="data:image/png;base64,{cand['plot_b64']}" alt="Waterfall {cand['peak_freq_mhz']} MHz" />
             </div>
@@ -223,17 +253,43 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
         """)
 
     target_rows = []
+    controls_total = controls_ok = 0
     for c in cadences:
+        chk = c.get("cadence_check", {})
+        verdicts = ", ".join(f"{n} {v}" for v, n in sorted(chk.get("verdict_counts", {}).items())) or "&ndash;"
+        ctrl = chk.get("negative_controls", [])
+        controls_total += len(ctrl)
+        controls_ok += sum(x["passed"] for x in ctrl)
+        if chk.get("error"):
+            ctrl_html = f'<span style="color:#f43f5e">check failed: {chk["error"]}</span>'
+        elif not ctrl:
+            ctrl_html = '<span style="color:#94a3b8">none (no OFF scan)</span>'
+        else:
+            ctrl_html = "<br>".join(
+                f'<span style="color:{"#34d399" if x["passed"] else "#f43f5e"}">{x["peak_freq_mhz"]:.4f} MHz &rarr; '
+                f'{x["cadence_verdict"]} ({x["cadence_detail"]})</span>' for x in ctrl
+            )
         target_rows.append(f"""
         <tr>
             <td><strong>{c['target_name']}</strong><br><small style="color:#94a3b8">{c['category']}</small></td>
             <td>{c['header']['fch1_mhz']:.2f} MHz<br><small>{c['header']['bandwidth_mhz']:.1f} MHz BW</small></td>
+            <td><strong>{chk.get('cadence', '?')}</strong><br><small>{len(chk.get('scans', []))} scans</small></td>
             <td>{c['n_channels_evaluated']:,}<br><small>({c['n_tiles_evaluated']:,} tiles)</small></td>
             <td>{c['raw_bytes_processed_mb']:.1f} MB<br><small style="color:#34d399">Purged after scan</small></td>
             <td><strong style="color:#fbbf24">{c['max_weirdness_score']:.1f} &sigma;</strong></td>
-            <td>{c['sky_localized_tiles_gt_15']} sky / {c['rfi_vetoed_tiles']} RFI vetoed</td>
+            <td>{verdicts}</td>
+            <td><small>{ctrl_html}</small></td>
         </tr>
         """)
+    cad_bench = survey_report.get("cadence_benchmark", {"passed": False, "checks": {}})
+    n_checks = len(cad_bench["checks"])
+    n_checks_ok = sum(x["ok"] for x in cad_bench["checks"].values())
+    filter_buttons = "".join(
+        f'<button class="btn" onclick="filterCards(\'{v}\', this)">{VERDICT_BADGES[v][1].title()} '
+        f'({sum(1 for x in all_cands if x.get("cadence_verdict", "UNTESTED") == v)})</button>'
+        for v in VERDICT_BADGES
+        if any(x.get("cadence_verdict", "UNTESTED") == v for x in all_cands)
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -351,13 +407,24 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
         border: 1px solid #1e293b;
     }}
     .metric span {{ color: #94a3b8; }}
+    .scan-strip {{ display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 12.5px; }}
+    .scan-strip-label {{ color: #94a3b8; margin-right: 4px; }}
+    .scan-cell {{
+        font-family: ui-monospace, Consolas, monospace;
+        padding: 3px 8px;
+        border-radius: 5px;
+        border: 1px solid #334155;
+        color: #94a3b8;
+    }}
+    .scan-cell.scan-hit {{ background: #38bdf833; border-color: #38bdf8; color: #e0f2fe; font-weight: 700; }}
+    .scan-cell.scan-off.scan-hit {{ background: #f43f5e33; border-color: #f43f5e; color: #ffe4e6; }}
     .plot-container img {{ width: 100%; border-radius: 8px; border: 1px solid #1e293b; }}
 </style>
 </head>
 <body>
     <h1>SETI Weirdness & Technosignature Observatory</h1>
     <div class="subtitle">
-        Breakthrough Listen Open Data Archive &bull; 5-Axis Unsupervised Anomaly Scorer + ON/OFF Sky-Localization Veto (one OFF scan per target) &bull; Rolling Staging Buffer on <code>E:\\seti_staging</code>
+        Breakthrough Listen Open Data Archive &bull; 5-Axis Unsupervised Anomaly Scorer on the first ON/OFF pair, then every candidate tested across the full ON/OFF cadence (badge = cadence verdict) &bull; Rolling Staging Buffer on <code>E:\\seti_staging</code>
     </div>
 
     <div class="kpi-grid">
@@ -379,6 +446,18 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
                 {'PASS (4/4 + RFI Veto)' if bench['passed'] else 'FAIL'}
             </div>
         </div>
+        <div class="kpi">
+            <div class="kpi-label">Synthetic Cadence Check</div>
+            <div class="kpi-val" style="color:{'#34d399' if cad_bench['passed'] else '#f43f5e'}">
+                {'PASS' if cad_bench['passed'] else 'FAIL'} ({n_checks_ok}/{n_checks})
+            </div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Real-Data Negative Controls &rarr; RFI</div>
+            <div class="kpi-val" style="color:{'#34d399' if controls_ok == controls_total else '#f43f5e'}">
+                {controls_ok}/{controls_total}
+            </div>
+        </div>
     </div>
 
     <h2>Target Cadence Summary</h2>
@@ -387,10 +466,12 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
             <tr>
                 <th>Target System</th>
                 <th>Band &amp; Bandwidth</th>
+                <th>Cadence</th>
                 <th>Channels Assessed</th>
                 <th>Streamed &amp; Purged</th>
                 <th>Peak Weirdness</th>
-                <th>Sky Candidates vs RFI Veto</th>
+                <th>Candidate Verdicts</th>
+                <th>Negative Controls (must be RFI)</th>
             </tr>
         </thead>
         <tbody>
@@ -401,8 +482,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
     <h2>Top Ranked Weirdness Candidates ({len(all_cands)} Cutouts)</h2>
     <div class="filter-bar">
         <button class="btn active" onclick="filterCards('all', this)">All Candidates ({len(all_cands)})</button>
-        <button class="btn" onclick="filterCards('sky', this)">Sky-Localized Only (ON-Exclusive)</button>
-        <button class="btn" onclick="filterCards('rfi', this)">Terrestrial / Satellite RFI Examples</button>
+        {filter_buttons}
     </div>
 
     <div id="cards-list">
@@ -415,7 +495,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
         btn.classList.add('active');
         document.querySelectorAll('.card').forEach(c => {{
             if (mode === 'all') c.style.display = 'block';
-            else c.style.display = (c.dataset.sky === mode) ? 'block' : 'none';
+            else c.style.display = (c.dataset.verdict === mode) ? 'block' : 'none';
         }});
     }}
     </script>
@@ -433,6 +513,12 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
     print("=================================================================")
     bench = run_synthetic_verification_benchmark()
     print(f"  Benchmark Passed: {bench['passed']} | Recovered Tiles: {bench['recovered_on_targets']} | RFI Tile 210 Vetoed Score: {bench['rfi_tile_210_score']}")
+    cadence_bench = run_synthetic_cadence_benchmark()
+    print(f"  Cadence Benchmark Passed: {cadence_bench['passed']}")
+    for chk_name, chk in cadence_bench["checks"].items():
+        print(f"    {chk_name}: expected {chk['expected']}, got {chk['got']}")
+    if not (bench["passed"] and cadence_bench["passed"]):
+        print("  [WARNING] A synthetic benchmark FAILED; treat every verdict below as untrusted.")
 
     cadence_reports = []
     for cad in STAGE1_CADENCES:
@@ -442,26 +528,26 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
         print(f" TARGET: {name} [{cad['category']}]")
         print("=================================================================")
 
-        on_entry = cad["on_files"][0]
-        off_entry = cad["off_files"][0] if cad.get("off_files") else None
+        scans = cad["scans"]
+        roles = [s["role"] for s in scans]
+        on1 = roles.index("ON")
+        off1 = roles.index("OFF") if "OFF" in roles else None
+        print(f"  Cadence: {cad['cadence']} ({len(scans)} scans: {' '.join(roles)})")
 
-        downloaded_files = []
+        scan_paths = [None] * len(scans)
         try:
-            on_path = download_file_streaming(on_entry["url"], STAGING_RAW_DIR)
-            downloaded_files.append(on_path)
+            scan_paths[on1] = download_file_streaming(scans[on1]["url"], STAGING_RAW_DIR)
             off_path = None
-            if off_entry:
-                off_path = download_file_streaming(off_entry["url"], STAGING_RAW_DIR)
-                downloaded_files.append(off_path)
+            if off1 is not None:
+                off_path = scan_paths[off1] = download_file_streaming(scans[off1]["url"], STAGING_RAW_DIR)
 
-            raw_mb = sum(os.path.getsize(p) for p in downloaded_files if os.path.exists(p)) / (1024 * 1024)
-            print(f"  [ASSESSING] Running 5-Axis Weirdness + ON/OFF Veto on {name} ...")
-            summary = assess_cadence(on_path, off_path, tile_width=256, top_k=top_k_per_cadence)
+            off_label = scans[off1]["label"] if off1 is not None else "no OFF scan"
+            print(f"  [ASSESSING] Running 5-Axis Weirdness + ON/OFF Veto on {name} ({scans[on1]['label']} vs {off_label}) ...")
+            summary = assess_cadence(scan_paths[on1], off_path, tile_width=256, top_k=top_k_per_cadence)
             summary["cadence_id"] = cid
             summary["target_name"] = name
             summary["category"] = cad["category"]
             summary["description"] = cad["description"]
-            summary["raw_bytes_processed_mb"] = round(raw_mb, 2)
 
             # Render waterfall plots for each candidate and strip raw numpy arrays for JSON
             clean_candidates = []
@@ -477,13 +563,32 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
                     f"ON/OFF={cand['on_off_ratio']:.2f}x | {cand['classification']}"
                 )
             summary["candidates"] = clean_candidates
+
+            # Full-cadence test: every candidate, every scan of the cadence. If it cannot run,
+            # the candidates stay UNTESTED rather than keeping their single-pair label.
+            try:
+                for i, s in enumerate(scans):
+                    if scan_paths[i] is None:
+                        scan_paths[i] = download_file_streaming(s["url"], STAGING_RAW_DIR, timeout=300)
+                print(f"  [CADENCE CHECK] Testing {len(clean_candidates)} candidates across all {len(scans)} scans ...")
+                summary["cadence_check"] = run_cadence_check(cad, summary, scan_paths)
+                print_cadence_result(summary, summary["cadence_check"])
+            except Exception as e:
+                print(f"  [ERROR] Cadence check failed for {name}: {e}")
+                summary["cadence_check"] = {"cadence": cad["cadence"], "error": str(e), "negative_controls": [],
+                                            "negative_controls_passed": None, "verdict_counts": {}}
+                for c in clean_candidates:
+                    c["cadence_verdict"], c["cadence_detail"], c["cadence_scans"] = "UNTESTED", f"cadence check failed: {e}", []
+            summary["raw_bytes_processed_mb"] = round(
+                sum(os.path.getsize(p) for p in scan_paths if p and os.path.exists(p)) / (1024 * 1024), 2
+            )
             cadence_reports.append(summary)
 
         except Exception as e:
             print(f"  [ERROR] Failed processing {name}: {e}")
         finally:
             if not keep_raw:
-                for p in downloaded_files:
+                for p in scan_paths:
                     if p and os.path.exists(p):
                         os.remove(p)
                         print(f"  [PURGED RAW] {os.path.basename(p)} removed from E:\\seti_staging\\raw")
@@ -491,6 +596,7 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
     full_report = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "benchmark": bench,
+        "cadence_benchmark": cadence_bench,
         "cadences": cadence_reports,
     }
 

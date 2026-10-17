@@ -698,7 +698,10 @@ def drift_aligned_snr(
     med = float(np.median(bg))
     sigma = max(1.4826 * float(np.median(np.abs(bg - med))), 1e-6)
     k = int(np.argmax(np.where(win, dd, -np.inf)))
-    return {"snr": (float(dd[k]) - med) / sigma, "offset_ch": int(offs[k]), "search_chans": int(search_chans)}
+    # raw_snr is on Stage 1's scale (track sum / sqrt(T), assumes white noise). snr uses the
+    # measured spread of nearby tracks, which on some scans (TRAPPIST-1) is 2-4x wider.
+    return {"snr": (float(dd[k]) - med) / sigma, "raw_snr": float(dd[k]), "offset_ch": int(offs[k]),
+            "search_chans": int(search_chans)}
 
 
 def cadence_verdict(scans: list[dict]) -> tuple[str, str]:
@@ -751,6 +754,7 @@ def cadence_test_signals(
             rows[j].append({
                 "scan": i, "role": role, "dt_s": round(dt, 1),
                 "snr": None if m is None else round(m["snr"], 1),
+                "raw_snr": None if m is None else round(m["raw_snr"], 1),
                 "offset_ch": None if m is None else m["offset_ch"],
                 "search_chans": None if m is None else m["search_chans"],
                 "present": None if m is None else bool(m["snr"] >= CADENCE_PRESENT_SNR),
