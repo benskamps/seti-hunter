@@ -28,6 +28,8 @@ from weirdness_engine import (
     CADENCE_PRESENT_SNR,
     OFF_DETECTION_SNR,
     assess_cadence,
+    gate_verdicts,
+    run_cadence_edge_case_benchmark,
     run_noise_calibration_benchmark,
     run_synthetic_cadence_benchmark,
     run_synthetic_verification_benchmark,
@@ -284,8 +286,9 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
         </tr>
         """)
     cad_bench = survey_report.get("cadence_benchmark", {"passed": False, "checks": {}})
-    n_checks = len(cad_bench["checks"])
-    n_checks_ok = sum(x["ok"] for x in cad_bench["checks"].values())
+    all_checks = list(cad_bench["checks"].values()) + list(cad_bench.get("edge_cases", {}).get("checks", {}).values())
+    n_checks = len(all_checks)
+    n_checks_ok = sum(x["ok"] for x in all_checks)
     filter_buttons = "".join(
         f'<button class="btn" onclick="filterCards(\'{v}\', this)">{v} '
         f'({sum(1 for x in all_cands if x.get("cadence_verdict", "UNTESTED") == v)})</button>'
@@ -525,8 +528,16 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
     print(f"  Cadence Benchmark Passed: {cadence_bench['passed']}")
     for chk_name, chk in cadence_bench["checks"].items():
         print(f"    {chk_name}: expected {chk['expected']}, got {chk['got']}")
-    if not (bench["passed"] and cadence_bench["passed"]):
-        print("  [WARNING] A synthetic benchmark FAILED; treat every verdict below as untrusted.")
+    edge_bench = run_cadence_edge_case_benchmark()
+    print(f"  Cadence Edge-Case Benchmark Passed: {edge_bench['passed']}")
+    for chk_name, chk in edge_bench["checks"].items():
+        print(f"    {chk_name}: {'ok' if chk['ok'] else 'FAILED'} ({chk.get('got')})")
+    cadence_bench["edge_cases"] = edge_bench
+    cadence_bench["passed_main_only"] = cadence_bench["passed"]
+    cadence_bench["passed"] = cadence_bench["passed"] and edge_bench["passed"]
+    benchmarks_passed = bench["passed"] and cadence_bench["passed"]
+    if not benchmarks_passed:
+        print("  [WARNING] A synthetic benchmark FAILED; every PASSES verdict below is withheld (UNTESTED).")
 
     cadence_reports = []
     for cad in STAGE1_CADENCES:
@@ -580,6 +591,7 @@ def run_stage1_survey(keep_raw: bool = False, top_k_per_cadence: int = 5):
                         scan_paths[i] = download_file_streaming(s["url"], STAGING_RAW_DIR, timeout=300)
                 print(f"  [CADENCE CHECK] Testing {len(clean_candidates)} candidates across all {len(scans)} scans ...")
                 summary["cadence_check"] = run_cadence_check(cad, summary, scan_paths)
+                gate_verdicts(clean_candidates, summary["cadence_check"]["negative_controls_passed"], benchmarks_passed)
                 print_cadence_result(summary, summary["cadence_check"])
             except Exception as e:
                 print(f"  [ERROR] Cadence check failed for {name}: {e}")

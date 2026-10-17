@@ -851,6 +851,25 @@ def cadence_verdict(scans: list[dict]) -> tuple[str, str]:
     return "PARTIAL", detail
 
 
+def gate_verdicts(candidates: list[dict], controls_passed: bool | None, benchmarks_passed: bool) -> None:
+    """A PASSES verdict is only as good as the check that produced it: if this target's
+    negative control did not come back RFI, or any synthetic benchmark failed, PASSES is
+    withheld (verdict UNTESTED, reason in cadence_detail, original in cadence_verdict_raw).
+    controls_passed is None when the target has no OFF scan (its verdicts are UNTESTED)."""
+    reasons = []
+    if controls_passed is False:
+        reasons.append("a negative control did not come back RFI")
+    if not benchmarks_passed:
+        reasons.append("a synthetic benchmark failed")
+    if not reasons:
+        return
+    for c in candidates:
+        if c.get("cadence_verdict") == "PASSES":
+            c["cadence_verdict_raw"] = "PASSES"
+            c["cadence_verdict"] = "UNTESTED"
+            c["cadence_detail"] = f"PASSES withheld: {'; '.join(reasons)} ({c.get('cadence_detail', '')})"
+
+
 BANK_EDGE_REFINE_FACTOR = 4  # re-search drift out to this many times the Stage 1 bank limit
 BANK_EDGE_START_CHANS = 3    # and the start channel within +/- this many channels
 
