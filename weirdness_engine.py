@@ -958,6 +958,132 @@ def run_synthetic_cadence_benchmark(
     }
 
 
+def synthetic_cadence_scans(
+    injections: list[tuple], seed: int, n_scans: int = 6, T: int = 16, N: int = 65536,
+    tsamp: float = 18.25, slew: float = 30.0, foff_hz: float = 2800.0, tile_width: int = 256,
+) -> list[tuple[np.ndarray, np.ndarray, dict]]:
+    """Synthetic (data, freqs, header) scans of an ON/OFF cadence in observing order.
+    injections: (tile, chan in tile at scan 0 t=0, channels drifted per (T-1) samples,
+    amplitude, set of scan indices where present)."""
+    rng = np.random.default_rng(seed)
+    span = (T - 1) * tsamp
+    t0_mjd = 60000.0
+    freqs = 1420.0 + np.arange(N, dtype=np.float64) * (foff_hz / 1e6)
+    scans = []
+    for k in range(n_scans):
+        tstart = t0_mjd + k * (T * tsamp + slew) / 86400.0
+        data = rng.normal(loc=100.0, scale=1.0, size=(T, N)).astype(np.float32)
+        for tile, c_in, drift, amp, present in injections:
+            if k not in present:
+                continue
+            for t in range(T):
+                elapsed = (tstart - t0_mjd) * 86400.0 + t * tsamp
+                data[t, int(round(tile * tile_width + c_in + drift * elapsed / span))] += amp
+        hdr = {
+            "source_name": "SYNTHETIC_EDGE_CASES", "fch1_mhz": float(freqs[0]), "foff_mhz": foff_hz / 1e6,
+            "foff_hz": foff_hz, "tsamp_s": tsamp, "tstart_mjd": tstart, "n_time": T,
+            "n_chans": N, "total_duration_s": T * tsamp, "bandwidth_mhz": N * foff_hz / 1e6,
+        }
+        scans.append((data, freqs, hdr))
+    return scans
+
+
+def _direct_signal(scans: list, tile: int, c_in: int, drift_bins: int, tile_width: int = 256) -> dict:
+    """A cadence test signal built straight from an injection (bypassing Stage 1), in the
+    same form Stage 1 candidates take."""
+    _, freqs, hdr = scans[0]
+    span = track_span_s(hdr, hdr["n_time"])
+    return {
+        "peak_freq_mhz": float(freqs[tile * tile_width + c_in]),
+        "drift_rate_hz_s": round(drift_bins * hdr["foff_hz"] / span, 3),
+        "drift_bins": drift_bins, "max_drift_bins": 10, "t_ref_mjd": hdr["tstart_mjd"],
+        "ref_span_s": span, "ref_foff_hz": hdr["foff_hz"],
+    }
+
+
+def run_cadence_edge_case_benchmark() -> dict:
+    """
+    One case per defect found by the 2026-10-16 Codex review of the cadence check. Each case
+    was run against the code as reviewed (d48b19b) and failed there before its fix.
+      bug1_unmeasured_scans   cadence_verdict must not count an unmeasured (None) scan as
+                              absent: ON/OFF/ON/OFF = True/None/True/None is not PASSES, and
+                              True/False/None/False is not ONE-OFF.
+      bug2_neighbor_carrier   a signal in every ON, with an unrelated carrier 10 channels from
+                              its track in OFF_2 only, must PASS (not be vetoed by the neighbor).
+      bug3_band_edge          a carrier 3 channels from the band edge, in every ON, must PASS
+                              (not come back unmeasured).
+      bug4_drift_bank_edge    a +14-bin/scan drifter in every ON (Stage 1 caps at +/-10) must
+                              PASS after the drift is refined.
+      bug5_rounded_drift      T=17, 2.8 Hz channels, -8-bin drifter: the cadence SNR in the
+                              scan Stage 1 scored must match Stage 1 (the stored drift rate is
+                              rounded to 0.001 Hz/s, which moves exact-half rows).
+      advisory_gate           gate_verdicts must withhold PASSES when a negative control or a
+                              benchmark failed.
+    """
+    W = 256
+    roles4 = ["ON", "OFF", "ON", "OFF"]
+    roles6 = ["ON", "OFF", "ON", "OFF", "ON", "OFF"]
+    checks = {}
+
+    def run(name, fn):
+        try:
+            checks[name] = fn()
+        except Exception as e:  # a missing function counts as a failing case
+            checks[name] = {"ok": False, "got": f"{type(e).__name__}: {e}"}
+
+    def bug1():
+        a = cadence_verdict([{"role": r, "present": p} for r, p in zip(roles4, [True, None, True, None])])[0]
+        b = cadence_verdict([{"role": r, "present": p} for r, p in zip(roles4, [True, False, None, False])])[0]
+        return {"expected": "neither PASSES nor ONE-OFF", "got": f"{a}, {b}", "ok": a != "PASSES" and b != "ONE-OFF"}
+
+    def bug2():
+        # signal: tile 60, +3 bins/scan in ON 0,2,4. Neighbor: same drift, +10 channels, OFF_2 (scan 3) only.
+        scans = synthetic_cadence_scans([(60, 100, 3.0, 4.0, {0, 2, 4}), (60, 110, 3.0, 8.0, {3})], seed=101)
+        sig = _direct_signal(scans, 60, 100, 3)
+        res = cadence_test_signals(lambda i: scans[i], roles6, [sig], tile_width=W)[0]
+        return {"expected": "PASSES", "got": res["cadence_verdict"],
+                "off2": res["cadence_scans"][3], "ok": res["cadence_verdict"] == "PASSES"}
+
+    def bug3():
+        scans = synthetic_cadence_scans([(0, 3, 0.0, 4.0, {0, 2, 4})], seed=102)
+        sig = _direct_signal(scans, 0, 3, 0)
+        res = cadence_test_signals(lambda i: scans[i], roles6, [sig], tile_width=W)[0]
+        return {"expected": "PASSES", "got": res["cadence_verdict"],
+                "on1": res["cadence_scans"][0], "ok": res["cadence_verdict"] == "PASSES"}
+
+    def bug4():
+        scans = synthetic_cadence_scans([(100, 60, 14.0, 8.0, {0, 2, 4})], seed=103)
+        stage1 = assess_arrays(scans[0], scans[1], tile_width=W, top_k=4)
+        cand = next((c for c in stage1["candidates"] if abs(c["tile_idx"] - 100) <= 1), None)
+        if cand is None:
+            return {"expected": "PASSES", "got": "not a Stage 1 candidate", "ok": False}
+        res = cadence_test_signals(lambda i: scans[i], roles6, [cand], tile_width=W)[0]
+        return {"expected": "PASSES", "got": res["cadence_verdict"], "stage1_drift_bins": cand["drift_bins"],
+                "snrs": [r["snr"] for r in res["cadence_scans"]], "ok": res["cadence_verdict"] == "PASSES"}
+
+    def bug5():
+        scans = synthetic_cadence_scans([(50, 128, -8.0, 5.0, {0})], seed=104, n_scans=2, T=17, foff_hz=2.8)
+        stage1 = assess_arrays(scans[0], scans[1], tile_width=W, top_k=4)
+        cand = next((c for c in stage1["candidates"] if c["tile_idx"] == 50), None)
+        if cand is None:
+            return {"expected": "agreement", "got": "not a Stage 1 candidate", "ok": False}
+        res = cadence_test_signals(lambda i: scans[i], ["ON", "OFF"], [cand], tile_width=W)[0]
+        on1 = res["cadence_scans"][0]["snr"]
+        return {"expected": f"|ON_1 SNR - drift_snr| <= {SNR_AGREEMENT_TOL}", "got": f"{on1} vs {cand['drift_snr']}",
+                "ok": on1 is not None and abs(on1 - cand["drift_snr"]) <= SNR_AGREEMENT_TOL}
+
+    def advisory():
+        cands = [{"cadence_verdict": "PASSES", "cadence_detail": "in 3/3 ON, 0/3 OFF"}]
+        gate_verdicts(cands, controls_passed=False, benchmarks_passed=True)
+        return {"expected": "PASSES withheld", "got": cands[0]["cadence_verdict"],
+                "ok": cands[0]["cadence_verdict"] != "PASSES"}
+
+    for name, fn in (("bug1_unmeasured_scans", bug1), ("bug2_neighbor_carrier", bug2), ("bug3_band_edge", bug3),
+                     ("bug4_drift_bank_edge", bug4), ("bug5_rounded_drift", bug5), ("advisory_gate", advisory)):
+        run(name, fn)
+    return {"passed": all(c["ok"] for c in checks.values()), "checks": checks}
+
+
 if __name__ == "__main__":
     res = run_synthetic_verification_benchmark()
     print(json.dumps(res, indent=2))
