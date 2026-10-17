@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listening to 1,133 stars &middot; seti-hunter &middot; Broken Branch</title>
+    <meta name="description" content="A public, live SETI survey: every star in Breakthrough Listen's Green Bank sample re-searched for wide, curving, flickering and comb-shaped radio signals. Every flagged signal goes down the same five-rung ladder, and the reason each was eliminated is published.">
+    <meta name="author" content="Ben Schippers">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.brokenbranch.dev/listen/">
+    <meta property="og:title" content="Listening to 1,133 stars">
+    <meta property="og:description" content="A live SETI survey of Breakthrough Listen's public Green Bank data. Every flagged signal, and the exact reason it was eliminated.">
+    <meta property="og:site_name" content="Broken Branch">
+    <meta property="og:image" content="https://www.brokenbranch.dev/listen/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="An all-sky map of the 1,133 surveyed stars above the 1.1 to 2.8 GHz radio band, a Broken Branch card.">
+
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://www.brokenbranch.dev/listen/">
+    <meta property="twitter:title" content="Listening to 1,133 stars">
+    <meta property="twitter:description" content="A live SETI survey of Breakthrough Listen's public Green Bank data, with every elimination published.">
+    <meta property="twitter:image" content="https://www.brokenbranch.dev/listen/og.png">
+    <meta name="twitter:image:alt" content="An all-sky map of the 1,133 surveyed stars above the 1.1 to 2.8 GHz radio band.">
+
+    <meta name="theme-color" content="#1c1510">
+    <link rel="canonical" href="https://www.brokenbranch.dev/listen/">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231c1510'/%3E%3Cpath d='M10 44c8-20 14-20 22 0s14 20 22 0' fill='none' stroke='%23e8833a' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='18' r='5' fill='%23ffd166'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="author" href="/humans.txt">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "seti-hunter: a public survey of Breakthrough Listen's Green Bank sample",
+        "description": "Every star in Price et al. 2020's Green Bank sample, re-searched for non-narrowband signal shapes. Every flagged signal is published with the rung of a frozen five-rung rejection ladder that eliminated it.",
+        "url": "https://www.brokenbranch.dev/listen/",
+        "creator": {"@type": "Person", "@id": "https://www.brokenbranch.dev/#person", "name": "Ben Schippers"},
+        "isBasedOn": ["https://seti.berkeley.edu/opendata", "https://arxiv.org/abs/1906.07750"],
+        "isPartOf": {"@type": "WebSite", "name": "Broken Branch", "url": "https://www.brokenbranch.dev/"}
+    }
+    </script>
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+      {"@type":"ListItem","position":1,"name":"Home","item":"https://www.brokenbranch.dev/"},
+      {"@type":"ListItem","position":2,"name":"The Lab","item":"https://www.brokenbranch.dev/labs/"},
+      {"@type":"ListItem","position":3,"name":"Listening to 1,133 stars","item":"https://www.brokenbranch.dev/listen/"}]}
+    </script>
+
+    <link rel="stylesheet" href="/css/tokens.css">
+    <link rel="stylesheet" href="listen.css">
+    <script src="stars.js" defer></script>
+    <script src="listen.js" defer></script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to content</a>
+<div class="lamplight"></div>
+<div class="motes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<div class="spine" aria-hidden="true"><i></i></div>
+
+<header class="topbar">
+    <nav class="crumb" aria-label="Breadcrumb"><a href="/labs/">&larr; the lab</a> &middot; <a href="/">brokenbranch.dev</a></nav>
+    <p class="status" data-slot="status" role="status"><span class="status-dot"></span><span data-slot="status-text">Reading the run&hellip;</span></p>
+</header>
+
+<main id="main-content">
+
+    <!-- ============================================================ 01 · hero -->
+    <section class="hero" aria-labelledby="h-hero">
+        <p class="eyebrow">seti-hunter &middot; a public survey &middot; Green Bank &middot; 1.1&ndash;2.8 GHz</p>
+        <h1 id="h-hero">Listening to <em><span data-slot="star-total">1,133</span> stars</em> for the signals nobody else looked for.</h1>
+        <p class="lede">Every star Breakthrough Listen pointed the Green Bank Telescope at for its 2016&ndash;2019 survey, searched again for wide, curving, flickering and comb-shaped radio signals. Everything the search flags goes down the same five-rung ladder in public, and this page shows the reason each one was eliminated.</p>
+        <p class="lede lede-2">The expected answer is a limit, not a detection. A survivor becomes a request to look again, never a claim.</p>
+        <dl class="stat-strip">
+            <div class="stat"><dt>stars searched</dt><dd data-count="stars_done">&mdash;</dd></div>
+            <div class="stat"><dt>signals flagged</dt><dd data-count="flagged">&mdash;</dd></div>
+            <div class="stat"><dt>eliminated, with a reason</dt><dd data-count="eliminated">&mdash;</dd></div>
+            <div class="stat stat-gold"><dt>under private review</dt><dd data-count="under_review">&mdash;</dd></div>
+        </dl>
+        <p class="hero-badge"><span class="badge" data-slot="badge">&hellip;</span></p>
+    </section>
+
+    <!-- ============================================================ 02 · how to read -->
+    <section class="sec" id="read" aria-labelledby="h-read">
+        <header class="sec-head">
+            <p class="sec-num">01</p>
+            <h2 id="h-read">How to read everything below</h2>
+            <p class="blurb">Three ideas carry the whole page: how the telescope looks, what a real signal&rsquo;s fingerprint is, and the ladder every flagged signal climbs down.</p>
+        </header>
+        <div class="read-grid">
+            <article class="read-card">
+                <h3><span class="rc-num">i</span> What a cadence is</h3>
+                <svg class="cadence-svg" viewBox="0 0 300 96" role="img" aria-label="Six five-minute scans alternating between the star and empty sky, about thirty minutes in all">
+                    <g class="cad-blocks">
+                        <rect x="6" y="24" width="42" height="30" rx="4" class="on"/><rect x="54" y="24" width="42" height="30" rx="4" class="off"/>
+                        <rect x="102" y="24" width="42" height="30" rx="4" class="on"/><rect x="150" y="24" width="42" height="30" rx="4" class="off"/>
+                        <rect x="198" y="24" width="42" height="30" rx="4" class="on"/><rect x="246" y="24" width="42" height="30" rx="4" class="off"/>
+                    </g>
+                    <g class="cad-labels">
+                        <text x="27" y="43">ON</text><text x="75" y="43">OFF</text><text x="123" y="43">ON</text>
+                        <text x="171" y="43">OFF</text><text x="219" y="43">ON</text><text x="267" y="43">OFF</text>
+                    </g>
+                    <line x1="6" y1="68" x2="288" y2="68" class="cad-axis"/>
+                    <text x="6" y="86" class="cad-tick">0 min</text><text x="288" y="86" class="cad-tick end">~30 min</text>
+                    <text x="6" y="14" class="cad-tick">ON = at the star &#183; OFF = elsewhere in the sky</text>
+                </svg>
+                <p>Each five-minute look at the star alternates with a look somewhere else. A signal from the star should follow the telescope: there in every ON, gone in every OFF.</p>
+            </article>
+            <article class="read-card">
+                <h3><span class="rc-num">ii</span> The three fingerprints</h3>
+                <div class="fp-row">
+                    <figure class="fp"><div class="fp-bars" data-fp="30,3,28,2,31,3"></div><figcaption><b class="fp-gold">From the star</b><span>every ON, no OFF</span></figcaption></figure>
+                    <figure class="fp"><div class="fp-bars" data-fp="34,33,35,32,34,33"></div><figcaption><b>Interference</b><span>there wherever we point</span></figcaption></figure>
+                    <figure class="fp"><div class="fp-bars" data-fp="38,2,3,2,3,2"></div><figcaption><b>One-off</b><span>one scan, then gone</span></figcaption></figure>
+                </div>
+                <p>Bar height is signal strength in each of the six scans; the dashed line is the detection threshold. Only the first pattern survives rungs 1 and 2. Fingerprints here are drawn as a guide, not data.</p>
+            </article>
+            <article class="read-card">
+                <h3><span class="rc-num">iii</span> The ladder, in order</h3>
+                <ol class="ladder">
+                    <li><span class="rung r1">1</span><span>Present in any <b>OFF</b> scan</span></li>
+                    <li><span class="rung r2">2</span><span>Missing from any <b>ON</b> scan</span></li>
+                    <li><span class="rung r3">3</span><span>An <b>instrument artifact</b>: a coarse-channel spike or edge</span></li>
+                    <li><span class="rung r4">4</span><span>Inside a known <b>human transmitter</b> band</span></li>
+                    <li><span class="rung r5">5</span><span>Also seen around <b>another star</b></span></li>
+                    <li class="ladder-pass"><span class="rung rp">&#10003;</span><span>Passes all five &rarr; <b>private review</b></span></li>
+                </ol>
+                <p>Every flagged signal goes down the same rungs, frozen before the run. The page records the first rung that eliminated it.</p>
+            </article>
+        </div>
+    </section>
+
+    <!-- ============================================================ 03 · funnel -->
+    <section class="sec" id="funnel" aria-labelledby="h-funnel">
+        <header class="sec-head">
+            <p class="sec-num">02</p>
+            <h2 id="h-funnel">The Funnel</h2>
+            <p class="blurb">The whole survey in one picture. Every signal the detectors flag lands in exactly one row, so the rows add up to the top line. Click a rung to see what it eliminated.</p>
+        </header>
+        <div class="panel funnel-panel bracketed">
+            <div class="panel-badge"><span class="badge" data-slot="badge">&hellip;</span></div>
+            <ul class="funnel" data-slot="funnel"></ul>
+            <p class="funnel-sum" data-slot="funnel-sum"></p>
+            <p class="ruler">Bar length: share of all flagged signals (linear). &ldquo;Pending final check&rdquo; changes once a day, from the 00:00 UTC batch, so neither its jumps nor a gap in a star&rsquo;s list can point at one star.</p>
+        </div>
+    </section>
+
+    <!-- ============================================================ 04 · sky -->
+    <section class="sec" id="sky" aria-labelledby="h-sky">
+        <header class="sec-head">
+            <p class="sec-num">03</p>
+            <h2 id="h-sky">The sky we&rsquo;re listening to</h2>
+            <p class="blurb">Every dot is a real star from the sample, at its real position; the glowing band is the Milky Way. Stars the survey has finished light up gold. Replay plays the original 2016&ndash;2019 observing in the order the telescope visited them.</p>
+        </header>
+        <div class="glass sky-glass">
+            <div class="glass-top">
+                <span class="badge" data-slot="badge">&hellip;</span>
+                <button type="button" class="btn" data-action="replay"><span aria-hidden="true">&#9654;</span> Replay the survey</button>
+            </div>
+            <div class="sky-frame">
+                <canvas id="sky-canvas" width="1400" height="700" role="img" aria-label="All-sky map of the surveyed stars" tabindex="0"></canvas>
+                <div class="sky-hud" aria-live="polite"><b data-slot="sky-date">2016&ndash;2019</b><span data-slot="sky-count"></span></div>
+            </div>
+            <ul class="legend sky-legend">
+                <li><i class="sw sw-ls"></i>L- and S-band</li>
+                <li><i class="sw sw-l"></i>L-band only</li>
+                <li><i class="sw sw-s"></i>S-band only</li>
+                <li><i class="sw sw-done"></i>searched so far</li>
+            </ul>
+            <p class="glass-note" data-slot="sky-note">Hammer&ndash;Aitoff projection, equatorial coordinates, right ascension increasing to the left. Hover or tap a star for its name.</p>
+        </div>
+    </section>
+
+    <!-- ============================================================ 05 · spectrum -->
+    <section class="sec" id="band" aria-labelledby="h-band">
+        <header class="sec-head">
+            <p class="sec-num">04</p>
+            <h2 id="h-band">The band we&rsquo;re listening in</h2>
+            <p class="blurb">1.1 to 2.8 GHz. Amber bands are human transmitters, read from the frozen ladder that rung 4 uses. Hatched bands are receiver filters that record nothing; blue is nature&rsquo;s quiet zone, the water hole. Pins are eliminated signals, coloured by the rung that eliminated them.</p>
+        </header>
+        <div class="glass">
+            <div class="glass-top"><span class="badge" data-slot="badge">&hellip;</span><span class="glass-hint">swipe the band &rarr;</span></div>
+            <section class="spec-scroll" tabindex="0" aria-label="Radio spectrum figure (scrolls sideways on small screens)">
+                <svg id="spec-svg" viewBox="0 0 1200 312" role="img" aria-label="Radio spectrum from 1.1 to 2.8 GHz with interference bands and eliminated signals"></svg>
+            </section>
+            <div class="callouts" data-slot="callouts"></div>
+            <p class="glass-note" data-slot="band-note"></p>
+        </div>
+    </section>
+
+    <!-- ============================================================ 06 · wall -->
+    <section class="sec" id="wall" aria-labelledby="h-wall">
+        <header class="sec-head">
+            <p class="sec-num">05</p>
+            <h2 id="h-wall">The Weird Wall</h2>
+            <p class="blurb">The real ON-scan waterfalls (time runs up, frequency runs across), sorted by how weird the detector thought they were, each stamped with its fate. The gold slot is kept for anything nothing could explain. Click any tile for its Ledger entry.</p>
+        </header>
+        <div class="wall-bar">
+            <div class="chips" role="group" aria-label="Filter by rung" data-slot="chips"></div>
+            <label class="find"><span>find a star</span><input type="search" data-slot="find" placeholder="e.g. GJ411" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <p class="wall-badge"><span class="badge" data-slot="badge-wall">&hellip;</span></p>
+        <div class="wall" data-slot="wall"></div>
+        <p class="wall-more"><button type="button" class="btn" data-action="more" hidden>Show more</button></p>
+        <p class="caption">Figures update daily; numbers every ~15 minutes. The Wall and the Ledger can trail the Funnel by up to a day. A star&rsquo;s list appears only once nothing of it is still pending.</p>
+    </section>
+
+    <!-- ============================================================ 08 · heartbeat -->
+    <section class="sec" id="heartbeat" aria-labelledby="h-heart">
+        <header class="sec-head">
+            <p class="sec-num">06</p>
+            <h2 id="h-heart">While the run is going</h2>
+            <p class="blurb">A heartbeat for the weeks the survey runs unattended on one machine at home: which star is streaming, which of its six scans is being read, and how far along the run is.</p>
+        </header>
+        <div class="glass heart-glass">
+            <div class="glass-top"><span class="badge" data-slot="badge-heart">&hellip;</span><span class="glass-hint" data-slot="heart-updated"></span></div>
+            <div class="heart">
+                <div class="ring-wrap">
+                    <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+                        <defs><linearGradient id="ring-grad" x1="0" x2="1"><stop offset="0" stop-color="#7fe0d0"/><stop offset="1" stop-color="#ffd166"/></linearGradient></defs>
+                        <circle cx="100" cy="100" r="86" class="ring-track"/>
+                        <circle cx="100" cy="100" r="86" class="ring-fill" data-slot="ring"/>
+                    </svg>
+                    <div class="ring-txt"><b data-count="stars_done_ring">&mdash;</b><span>of <span data-slot="star-total-2">1,133</span> stars</span></div>
+                </div>
+                <div class="hstats">
+                    <div class="hstat hstat-now">
+                        <div><p class="l">now reading</p><p class="v v-star" data-slot="now-star">&mdash;</p></div>
+                        <div class="lights" data-slot="lights" role="group" aria-label="Scan position in the six-scan cadence">
+                            <span class="lt on">ON</span><span class="lt off">OFF</span><span class="lt on">ON</span><span class="lt off">OFF</span><span class="lt on">ON</span><span class="lt off">OFF</span>
+                        </div>
+                    </div>
+                    <div class="hstat"><p class="l">streamed</p><p class="v" data-slot="streamed">&mdash;</p></div>
+                    <div class="hstat"><p class="l">cadences scored</p><p class="v" data-slot="cad-done">&mdash;</p></div>
+                    <div class="hstat"><p class="l">parked after 3 tries</p><p class="v" data-slot="cad-parked">&mdash;</p></div>
+                    <div class="hstat"><p class="l">incomplete, listed</p><p class="v" data-slot="cad-incomplete">&mdash;</p></div>
+                    <div class="hstat hstat-wide"><p class="l">download speed, recent cadences</p><canvas class="spark" width="900" height="110" data-slot="spark" role="img" aria-label="Download speed sparkline"></canvas></div>
+                </div>
+            </div>
+            <p class="glass-note">Figures update daily; numbers every ~15 minutes. A parked cadence failed three times and is listed as not analysed, never silently skipped.</p>
+        </div>
+    </section>
+
+    <!-- ============================================================ 09 · boundary -->
+    <section class="sec" id="boundary" aria-labelledby="h-boundary">
+        <header class="sec-head">
+            <p class="sec-num">07</p>
+            <h2 id="h-boundary">What this survey does not claim</h2>
+        </header>
+        <div class="boundary">
+            <p class="boundary-label">BOUNDARY</p>
+            <div class="boundary-cols">
+                <div>
+                    <h3>Covered</h3>
+                    <ul>
+                        <li>Four committed shapes, each with an upper limit measured from planted signals in the real files: wide drifting carriers, fast and curving drifts, intermittent tones, and combs.</li>
+                        <li>An open-ended &ldquo;weird anything&rdquo; channel that goes down the same ladder, with no limit claimed for it.</li>
+                        <li>Drift rates from 0 to about &plusmn;95&nbsp;Hz/s, the edge of the drift bank.</li>
+                        <li>L- and S-band (1.1&ndash;2.8 GHz) mid-resolution Green Bank files, about 2.86&nbsp;kHz by 1.07&nbsp;s, complete six-scan cadences only. Incomplete cadences are counted and listed, not scored.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3>Not searched</h3>
+                    <ul>
+                        <li>Hz-narrow tones, beyond using them to calibrate. That is the ground of Price et al. 2020, Ma et al. 2023 and Painter et al. 2024.</li>
+                        <li>Millisecond pulses: one-second sampling can&rsquo;t see them.</li>
+                        <li>Parkes data, C- and X-band, and any star outside Price 2020&rsquo;s Green Bank tables.</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="boundary-key">An elimination is a reason, not a verdict on the star.</p>
+        </div>
+        <div class="never">
+            <h3>What this page will never show</h3>
+            <ul>
+                <li>A signal waiting on rung 5. Only a count, changed once a day.</li>
+                <li>A star&rsquo;s list while anything of it is still pending or under review.</li>
+                <li>The star, frequency or date of a signal under private review. Only the count, and the four-step tracker.</li>
+                <li>Anything the run&rsquo;s state file holds that isn&rsquo;t on the published contract. The survey redacts it, and the site&rsquo;s proxy redacts it again.</li>
+            </ul>
+        </div>
+    </section>
+</main>
+
+<!-- ============================================================ 07 · the ledger (one click deep) -->
+<dialog id="ledger" class="ledger" aria-labelledby="ledger-title">
+    <div class="ledger-inner">
+        <div class="ledger-head">
+            <div>
+                <p class="eyebrow">the ledger &middot; <span data-slot="lg-id"></span></p>
+                <h2 id="ledger-title" data-slot="lg-title">Ledger entry</h2>
+            </div>
+            <div class="ledger-nav">
+                <button type="button" class="btn btn-icon" data-action="lg-prev" aria-label="Previous signal">&larr;</button>
+                <button type="button" class="btn btn-icon" data-action="lg-next" aria-label="Next signal">&rarr;</button>
+                <button type="button" class="btn btn-icon" data-action="lg-close" aria-label="Close">&times;</button>
+            </div>
+        </div>
+        <div class="lg-stamp" data-slot="lg-stamp"></div>
+        <figure class="lg-figure" data-slot="lg-figure"></figure>
+        <div class="lg-facts">
+            <div class="fact"><p class="l">signal</p><div data-slot="lg-signal"></div></div>
+            <div class="fact"><p class="l">six-scan fingerprint</p><div data-slot="lg-fp"></div></div>
+            <div class="fact"><p class="l">ladder</p><div data-slot="lg-ladder"></div></div>
+        </div>
+        <p class="lg-plain" data-slot="lg-plain"></p>
+        <p class="lg-key">An elimination is a reason, not a verdict on the star.</p>
+    </div>
+</dialog>
+
+<div class="tip" data-slot="tip" role="tooltip" hidden></div>
+
+<footer class="foot">
+    <div class="foot-cols">
+        <div>
+            <p class="l">data</p>
+            <p><a href="https://seti.berkeley.edu/opendata">Breakthrough Listen open data</a>, Green Bank Telescope, 2016&ndash;2019. The sample is the 1,133 distinct stars in the tables of <a href="https://arxiv.org/abs/1906.07750">Price et al. 2020</a>.</p>
+        </div>
+        <div>
+            <p class="l">code</p>
+            <p>Every number on this page comes from the open code at <a href="https://github.com/benskamps/seti-hunter">github.com/benskamps/seti-hunter</a>. Regenerate the page&rsquo;s baked data with <code>python scripts/bake_stars.py</code> and <code>python scripts/make_demo.py</code>.</p>
+        </div>
+        <div>
+            <p class="l">by</p>
+            <p>Ben Schippers, independent researcher, Broken Branch. Built with Claude and Codex; the paper discloses it.</p>
+        </div>
+    </div>
+    <p class="contract">numbers from the run&rsquo;s state file &middot; redacted twice &middot; eliminated, never hidden</p>
+    <p class="signoff">Strogies supervised from a sunbeam, as is tradition.</p>
+</footer>
+
+<noscript><p class="noscript">This page reads the survey&rsquo;s live numbers with JavaScript. Without it, the counts stay blank rather than show zeros that aren&rsquo;t real.</p></noscript>
+</body>
+</html>

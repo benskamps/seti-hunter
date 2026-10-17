@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "E:/seti_staging/results"],
       "port": 8765
+    },
+    {
+      "name": "listen",
+      "runtimeExecutable": "E:/seti_staging/venv/Scripts/python.exe",
+      "runtimeArgs": ["scripts/serve_listen.py", "--site", "../bb-listen-wing", "--port", "8766"],
+      "port": 8766
     }
   ]
 }
