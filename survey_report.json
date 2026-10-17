@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-17T03:17:48Z",
+  "generated_at": "2026-10-17T05:03:26Z",
   "benchmark": {
     "passed": true,
     "top_6_tiles": [
@@ -88,8 +88,8 @@
         "ok": true
       },
       "on1_snr_agreement": {
-        "expected": "|cadence ON_1 SNR - Stage 1 drift_snr| <= 0.1 for all 8",
-        "got": "max 0.00 over 8",
+        "expected": "|cadence ON_1 SNR - Stage 1 drift_snr| <= 0.1 for all 8 unrefined",
+        "got": "max 0.00 over 8 (0 refined)",
         "diff_by_tile": {
           "90": 0.0,
           "140": 0.0,
@@ -112,7 +112,72 @@
       226,
       214,
       241
-    ]
+    ],
+    "edge_cases": {
+      "passed": true,
+      "checks": {
+        "bug1_unmeasured_scans": {
+          "expected": "neither PASSES nor ONE-OFF",
+          "got": "INCOMPLETE, INCOMPLETE",
+          "ok": true
+        },
+        "bug2_neighbor_carrier": {
+          "expected": "PASSES",
+          "got": "PASSES",
+          "off2": {
+            "scan": 3,
+            "role": "OFF",
+            "dt_s": 1102.9,
+            "snr": 1.28,
+            "raw_snr": 1.1,
+            "offset_ch": -7,
+            "search_chans": 7,
+            "present": false
+          },
+          "ok": true
+        },
+        "bug3_band_edge": {
+          "expected": "PASSES",
+          "got": "PASSES",
+          "on1": {
+            "scan": 0,
+            "role": "ON",
+            "dt_s": 136.9,
+            "snr": 15.01,
+            "raw_snr": 14.9,
+            "offset_ch": 0,
+            "search_chans": 3,
+            "present": true
+          },
+          "ok": true
+        },
+        "bug4_drift_bank_edge": {
+          "expected": "PASSES",
+          "got": "PASSES",
+          "stage1_drift_bins": 10,
+          "snrs": [
+            32.59,
+            1.86,
+            33.9,
+            1.76,
+            30.35,
+            3.24
+          ],
+          "ok": true
+        },
+        "bug5_rounded_drift": {
+          "expected": "|ON_1 SNR - drift_snr| <= 0.1",
+          "got": "15.98 vs 15.98",
+          "ok": true
+        },
+        "advisory_gate": {
+          "expected": "PASSES withheld",
+          "got": "UNTESTED",
+          "ok": true
+        }
+      }
+    },
+    "passed_main_only": true
   },
   "cadences": [
     {
@@ -131,8 +196,8 @@
       },
       "n_tiles_evaluated": 1232,
       "n_channels_evaluated": 315392,
-      "elapsed_s": 23.22,
-      "throughput_mchans_s": 3.79,
+      "elapsed_s": 26.93,
+      "throughput_mchans_s": 3.27,
       "max_weirdness_score": 90.58,
       "median_weirdness_score": 0.01,
       "rfi_vetoed_tiles": 124,
@@ -150,6 +215,9 @@
           "drift_bins": -5,
           "drift_rate_hz_s": -47.923,
           "t_ref_mjd": 57898.259375,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 502.83,
           "kurtosis": 95.7,
           "ts_max": 23306.44,
@@ -177,7 +245,7 @@
               "snr": 4380.42,
               "raw_snr": 7309.2,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0031)"
             },
@@ -185,10 +253,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 472.3,
-              "snr": 3.0,
-              "raw_snr": 3.3,
+              "snr": 2.98,
+              "raw_snr": 3.2,
               "offset_ch": -2,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0032)"
             },
@@ -196,10 +264,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 795.3,
-              "snr": 2.6,
-              "raw_snr": 2.8,
-              "offset_ch": 9,
-              "search_chans": 9,
+              "snr": 1.4,
+              "raw_snr": 1.6,
+              "offset_ch": 4,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0033)"
             },
@@ -207,10 +275,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1118.3,
-              "snr": 1.64,
-              "raw_snr": 1.8,
+              "snr": 1.37,
+              "raw_snr": 1.6,
               "offset_ch": 4,
-              "search_chans": 10,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0034)"
             },
@@ -221,7 +289,7 @@
               "snr": 2.48,
               "raw_snr": 2.4,
               "offset_ch": 1,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0035)"
             },
@@ -229,10 +297,10 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1765.3,
-              "snr": 0.4,
-              "raw_snr": 1.4,
-              "offset_ch": 10,
-              "search_chans": 12,
+              "snr": -0.46,
+              "raw_snr": 0.7,
+              "offset_ch": 8,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0036)"
             }
@@ -250,6 +318,9 @@
           "drift_bins": -5,
           "drift_rate_hz_s": -47.923,
           "t_ref_mjd": 57898.259375,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 489.52,
           "kurtosis": 76.76,
           "ts_max": 17861.22,
@@ -277,7 +348,7 @@
               "snr": 3043.52,
               "raw_snr": 5574.8,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0031)"
             },
@@ -285,10 +356,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 472.3,
-              "snr": 0.86,
-              "raw_snr": 1.2,
+              "snr": 1.08,
+              "raw_snr": 1.3,
               "offset_ch": 1,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0032)"
             },
@@ -296,10 +367,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 795.3,
-              "snr": 1.35,
+              "snr": 1.24,
               "raw_snr": 1.5,
               "offset_ch": -6,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0033)"
             },
@@ -307,10 +378,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1118.3,
-              "snr": 2.06,
-              "raw_snr": 2.1,
-              "offset_ch": -9,
-              "search_chans": 10,
+              "snr": 1.71,
+              "raw_snr": 1.8,
+              "offset_ch": -1,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0034)"
             },
@@ -321,7 +392,7 @@
               "snr": 1.93,
               "raw_snr": 1.7,
               "offset_ch": -7,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0035)"
             },
@@ -329,10 +400,10 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1765.3,
-              "snr": 2.72,
-              "raw_snr": 3.3,
+              "snr": 2.79,
+              "raw_snr": 3.4,
               "offset_ch": 0,
-              "search_chans": 12,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0036)"
             }
@@ -350,6 +421,9 @@
           "drift_bins": -5,
           "drift_rate_hz_s": -47.923,
           "t_ref_mjd": 57898.259375,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 414.18,
           "kurtosis": 95.51,
           "ts_max": 3957.07,
@@ -377,7 +451,7 @@
               "snr": 935.3,
               "raw_snr": 1214.5,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0031)"
             },
@@ -385,10 +459,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 472.3,
-              "snr": 1.08,
-              "raw_snr": 1.3,
-              "offset_ch": 6,
-              "search_chans": 8,
+              "snr": 0.87,
+              "raw_snr": 1.1,
+              "offset_ch": 3,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0032)"
             },
@@ -396,10 +470,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 795.3,
-              "snr": 1.41,
-              "raw_snr": 1.6,
-              "offset_ch": 9,
-              "search_chans": 9,
+              "snr": 1.39,
+              "raw_snr": 1.5,
+              "offset_ch": -1,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0033)"
             },
@@ -407,10 +481,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1118.3,
-              "snr": 1.19,
-              "raw_snr": 1.5,
-              "offset_ch": 4,
-              "search_chans": 10,
+              "snr": 1.17,
+              "raw_snr": 1.4,
+              "offset_ch": 5,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0034)"
             },
@@ -421,7 +495,7 @@
               "snr": 2.44,
               "raw_snr": 2.2,
               "offset_ch": 1,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0035)"
             },
@@ -429,10 +503,10 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1765.3,
-              "snr": 0.57,
-              "raw_snr": 1.6,
-              "offset_ch": 10,
-              "search_chans": 12,
+              "snr": -0.85,
+              "raw_snr": 0.4,
+              "offset_ch": 8,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0036)"
             }
@@ -450,6 +524,9 @@
           "drift_bins": -10,
           "drift_rate_hz_s": -95.847,
           "t_ref_mjd": 57898.259375,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 126.25,
           "kurtosis": 37.65,
           "ts_max": 27.73,
@@ -468,16 +545,16 @@
           "classification": "Drifting Narrowband Technosignature Candidate (-95.85 Hz/s)",
           "plot_path": "E:\\seti_staging\\results\\plots\\tabbys_star_sband_rank04_2218.3165MHz.png",
           "cadence_verdict": "ONE-OFF",
-          "cadence_detail": "in 1/3 ON, 0/3 OFF",
+          "cadence_detail": "in 1/3 ON, 0/3 OFF, drift refined -10 -> -14 bins",
           "cadence_scans": [
             {
               "scan": 0,
               "role": "ON",
               "dt_s": 149.3,
-              "snr": 41.84,
-              "raw_snr": 38.0,
+              "snr": 68.67,
+              "raw_snr": 66.7,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0031)"
             },
@@ -485,10 +562,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 472.3,
-              "snr": 1.32,
-              "raw_snr": 1.5,
-              "offset_ch": 2,
-              "search_chans": 8,
+              "snr": 1.44,
+              "raw_snr": 1.8,
+              "offset_ch": 5,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0032)"
             },
@@ -496,10 +573,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 795.3,
-              "snr": 1.59,
-              "raw_snr": 2.0,
-              "offset_ch": -9,
-              "search_chans": 9,
+              "snr": 2.57,
+              "raw_snr": 2.9,
+              "offset_ch": 0,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0033)"
             },
@@ -507,10 +584,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1118.3,
-              "snr": 1.41,
-              "raw_snr": 1.9,
-              "offset_ch": 5,
-              "search_chans": 10,
+              "snr": 1.83,
+              "raw_snr": 2.1,
+              "offset_ch": 6,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0034)"
             },
@@ -518,10 +595,10 @@
               "scan": 4,
               "role": "ON",
               "dt_s": 1441.3,
-              "snr": 1.93,
-              "raw_snr": 1.9,
-              "offset_ch": 4,
-              "search_chans": 11,
+              "snr": 2.64,
+              "raw_snr": 2.5,
+              "offset_ch": -7,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0035)"
             },
@@ -529,14 +606,25 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1765.3,
-              "snr": 2.22,
-              "raw_snr": 2.8,
-              "offset_ch": 5,
-              "search_chans": 12,
+              "snr": 1.78,
+              "raw_snr": 2.6,
+              "offset_ch": 3,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0036)"
             }
-          ]
+          ],
+          "cadence_drift_refined": {
+            "from": {
+              "drift_bins": -10,
+              "peak_freq_mhz": 2218.31646
+            },
+            "to": {
+              "drift_bins": -14,
+              "drift_rate_hz_s": -134.185,
+              "peak_freq_mhz": 2218.3250427246094
+            }
+          }
         }
       ],
       "negative_control": {
@@ -545,6 +633,10 @@
         "peak_freq_mhz": 2188.424491882324,
         "drift_rate_hz_s": 0.0,
         "t_ref_mjd": 57898.26311342593,
+        "drift_bins": 0,
+        "max_drift_bins": 6,
+        "ref_span_s": 298.500227072,
+        "ref_foff_hz": 2861.02294921875,
         "off_drift_snr": 9586.02
       },
       "on_file": "spliced_blc2021222324252627_guppi_57898_22410_DIAG_KIC8462852_0031.gpuspec.0002.h5",
@@ -598,16 +690,20 @@
             "peak_freq_mhz": 2188.424491882324,
             "drift_rate_hz_s": 0.0,
             "t_ref_mjd": 57898.26311342593,
+            "drift_bins": 0,
+            "max_drift_bins": 6,
+            "ref_span_s": 298.500227072,
+            "ref_foff_hz": 2861.02294921875,
             "off_drift_snr": 9586.02,
             "cadence_scans": [
               {
                 "scan": 0,
                 "role": "ON",
                 "dt_s": -173.7,
-                "snr": 10402.47,
-                "raw_snr": 9597.3,
-                "offset_ch": 5,
-                "search_chans": 7,
+                "snr": 7512.7,
+                "raw_snr": 6931.3,
+                "offset_ch": 1,
+                "search_chans": 3,
                 "present": true,
                 "label": "ON_1 (Scan 0031)"
               },
@@ -618,7 +714,7 @@
                 "snr": 9586.02,
                 "raw_snr": 9943.4,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "OFF_1 (Scan 0032)"
               },
@@ -626,10 +722,10 @@
                 "scan": 2,
                 "role": "ON",
                 "dt_s": 472.3,
-                "snr": 6728.54,
-                "raw_snr": 5735.9,
-                "offset_ch": 7,
-                "search_chans": 8,
+                "snr": 6365.72,
+                "raw_snr": 5426.6,
+                "offset_ch": -1,
+                "search_chans": 5,
                 "present": true,
                 "label": "ON_2 (Scan 0033)"
               },
@@ -640,7 +736,7 @@
                 "snr": 5303.44,
                 "raw_snr": 4129.4,
                 "offset_ch": -2,
-                "search_chans": 9,
+                "search_chans": 6,
                 "present": true,
                 "label": "OFF_2 (Scan 0034)"
               },
@@ -651,7 +747,7 @@
                 "snr": 8779.2,
                 "raw_snr": 9470.3,
                 "offset_ch": 5,
-                "search_chans": 10,
+                "search_chans": 7,
                 "present": true,
                 "label": "ON_3 (Scan 0035)"
               },
@@ -662,7 +758,7 @@
                 "snr": 6075.62,
                 "raw_snr": 6008.9,
                 "offset_ch": 5,
-                "search_chans": 11,
+                "search_chans": 8,
                 "present": true,
                 "label": "OFF_3 (Scan 0036)"
               }
@@ -684,7 +780,7 @@
                 "snr": 11784.97,
                 "raw_snr": 9775.0,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "ON_1 (Scan 0031)"
               },
@@ -695,7 +791,7 @@
                 "snr": 4148.83,
                 "raw_snr": 3695.8,
                 "offset_ch": -5,
-                "search_chans": 8,
+                "search_chans": 5,
                 "present": true,
                 "label": "OFF_1 (Scan 0032)"
               },
@@ -706,7 +802,7 @@
                 "snr": 8380.77,
                 "raw_snr": 8176.2,
                 "offset_ch": -2,
-                "search_chans": 9,
+                "search_chans": 6,
                 "present": true,
                 "label": "ON_2 (Scan 0033)"
               },
@@ -717,7 +813,7 @@
                 "snr": 7070.27,
                 "raw_snr": 6015.5,
                 "offset_ch": -2,
-                "search_chans": 10,
+                "search_chans": 7,
                 "present": true,
                 "label": "OFF_2 (Scan 0034)"
               },
@@ -728,7 +824,7 @@
                 "snr": 7575.09,
                 "raw_snr": 6833.0,
                 "offset_ch": -1,
-                "search_chans": 11,
+                "search_chans": 8,
                 "present": true,
                 "label": "ON_3 (Scan 0035)"
               },
@@ -739,7 +835,7 @@
                 "snr": 8986.33,
                 "raw_snr": 7908.4,
                 "offset_ch": -4,
-                "search_chans": 12,
+                "search_chans": 9,
                 "present": true,
                 "label": "OFF_3 (Scan 0036)"
               }
@@ -769,8 +865,8 @@
       },
       "n_tiles_evaluated": 1232,
       "n_channels_evaluated": 315392,
-      "elapsed_s": 24.68,
-      "throughput_mchans_s": 3.57,
+      "elapsed_s": 24.82,
+      "throughput_mchans_s": 3.55,
       "max_weirdness_score": 37.68,
       "median_weirdness_score": 0.0,
       "rfi_vetoed_tiles": 234,
@@ -788,6 +884,9 @@
           "drift_bins": -7,
           "drift_rate_hz_s": -67.093,
           "t_ref_mjd": 58100.91206018518,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 356.84,
           "kurtosis": 273.88,
           "ts_max": 1256.74,
@@ -815,7 +914,7 @@
               "snr": 76.99,
               "raw_snr": 80.1,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0011)"
             },
@@ -823,10 +922,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 463.3,
-              "snr": 1.82,
+              "snr": 1.75,
               "raw_snr": 3.9,
               "offset_ch": 5,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0012)"
             },
@@ -834,10 +933,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 777.3,
-              "snr": 2.36,
-              "raw_snr": 4.7,
+              "snr": 2.23,
+              "raw_snr": 4.6,
               "offset_ch": 5,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0013)"
             },
@@ -845,10 +944,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1091.3,
-              "snr": 3.63,
-              "raw_snr": 6.2,
-              "offset_ch": -6,
-              "search_chans": 10,
+              "snr": 3.78,
+              "raw_snr": 6.3,
+              "offset_ch": -7,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0014)"
             },
@@ -856,10 +955,10 @@
               "scan": 4,
               "role": "ON",
               "dt_s": 1405.3,
-              "snr": 6.21,
+              "snr": 6.07,
               "raw_snr": 6.9,
               "offset_ch": -1,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0015)"
             },
@@ -870,7 +969,7 @@
               "snr": 2.77,
               "raw_snr": 4.7,
               "offset_ch": 7,
-              "search_chans": 12,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0016)"
             }
@@ -888,6 +987,9 @@
           "drift_bins": -10,
           "drift_rate_hz_s": -95.847,
           "t_ref_mjd": 58100.91206018518,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 340.35,
           "kurtosis": 216.23,
           "ts_max": 903.11,
@@ -906,16 +1008,16 @@
           "classification": "Pulsed / Transient Narrowband Burst",
           "plot_path": "E:\\seti_staging\\results\\plots\\oumuamua_interstellar_rank02_2490.3854MHz.png",
           "cadence_verdict": "NOT-RECOVERED",
-          "cadence_detail": "in 0/3 ON, 0/3 OFF",
+          "cadence_detail": "in 0/3 ON, 0/3 OFF, drift refined -10 -> -17 bins",
           "cadence_scans": [
             {
               "scan": 0,
               "role": "ON",
               "dt_s": 149.3,
-              "snr": 6.1,
-              "raw_snr": 92.2,
-              "offset_ch": 0,
-              "search_chans": 7,
+              "snr": 7.07,
+              "raw_snr": 92.6,
+              "offset_ch": 1,
+              "search_chans": 3,
               "present": false,
               "label": "ON_1 (Scan 0011)"
             },
@@ -923,10 +1025,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 463.3,
-              "snr": 1.94,
-              "raw_snr": 10.2,
-              "offset_ch": -3,
-              "search_chans": 8,
+              "snr": 1.29,
+              "raw_snr": 7.1,
+              "offset_ch": -4,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0012)"
             },
@@ -934,10 +1036,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 777.3,
-              "snr": 2.01,
-              "raw_snr": 5.0,
-              "offset_ch": 5,
-              "search_chans": 9,
+              "snr": 1.6,
+              "raw_snr": 4.7,
+              "offset_ch": -5,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0013)"
             },
@@ -945,10 +1047,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1091.3,
-              "snr": 1.57,
-              "raw_snr": 5.3,
-              "offset_ch": -7,
-              "search_chans": 10,
+              "snr": 0.48,
+              "raw_snr": 2.9,
+              "offset_ch": -5,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0014)"
             },
@@ -956,10 +1058,10 @@
               "scan": 4,
               "role": "ON",
               "dt_s": 1405.3,
-              "snr": 2.38,
-              "raw_snr": 3.4,
-              "offset_ch": -4,
-              "search_chans": 11,
+              "snr": 2.57,
+              "raw_snr": 4.0,
+              "offset_ch": 4,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0015)"
             },
@@ -967,14 +1069,25 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1719.3,
-              "snr": 2.35,
-              "raw_snr": 4.4,
-              "offset_ch": -5,
-              "search_chans": 12,
+              "snr": 2.43,
+              "raw_snr": 3.8,
+              "offset_ch": 7,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0016)"
             }
-          ]
+          ],
+          "cadence_drift_refined": {
+            "from": {
+              "drift_bins": -10,
+              "peak_freq_mhz": 2490.385437
+            },
+            "to": {
+              "drift_bins": -17,
+              "drift_rate_hz_s": -162.939,
+              "peak_freq_mhz": 2490.3940200805664
+            }
+          }
         },
         {
           "tile_idx": 914,
@@ -988,6 +1101,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 58100.91206018518,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 334.52,
           "kurtosis": 235.88,
           "ts_max": 803.61,
@@ -1012,10 +1128,10 @@
               "scan": 0,
               "role": "ON",
               "dt_s": 149.3,
-              "snr": 6.28,
-              "raw_snr": 120.2,
-              "offset_ch": 7,
-              "search_chans": 7,
+              "snr": 3.85,
+              "raw_snr": 96.6,
+              "offset_ch": 3,
+              "search_chans": 3,
               "present": false,
               "label": "ON_1 (Scan 0011)"
             },
@@ -1026,7 +1142,7 @@
               "snr": 2.16,
               "raw_snr": 11.4,
               "offset_ch": 4,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0012)"
             },
@@ -1037,7 +1153,7 @@
               "snr": 1.87,
               "raw_snr": 3.6,
               "offset_ch": 6,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0013)"
             },
@@ -1048,7 +1164,7 @@
               "snr": 3.2,
               "raw_snr": 10.8,
               "offset_ch": 5,
-              "search_chans": 10,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0014)"
             },
@@ -1056,10 +1172,10 @@
               "scan": 4,
               "role": "ON",
               "dt_s": 1405.3,
-              "snr": 2.13,
-              "raw_snr": 7.9,
-              "offset_ch": 11,
-              "search_chans": 11,
+              "snr": 1.3,
+              "raw_snr": 6.4,
+              "offset_ch": -1,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0015)"
             },
@@ -1067,10 +1183,10 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1719.3,
-              "snr": 1.42,
-              "raw_snr": 6.2,
-              "offset_ch": 12,
-              "search_chans": 12,
+              "snr": 0.89,
+              "raw_snr": 5.2,
+              "offset_ch": 5,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0016)"
             }
@@ -1088,6 +1204,9 @@
           "drift_bins": -7,
           "drift_rate_hz_s": -67.093,
           "t_ref_mjd": 58100.91206018518,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 301.83,
           "kurtosis": 272.65,
           "ts_max": 417.65,
@@ -1115,7 +1234,7 @@
               "snr": 20.45,
               "raw_snr": 27.0,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0011)"
             },
@@ -1123,10 +1242,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 463.3,
-              "snr": 1.29,
-              "raw_snr": 4.9,
-              "offset_ch": -8,
-              "search_chans": 8,
+              "snr": 0.41,
+              "raw_snr": 3.3,
+              "offset_ch": -5,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0012)"
             },
@@ -1134,10 +1253,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 777.3,
-              "snr": 0.88,
-              "raw_snr": 2.8,
+              "snr": 0.8,
+              "raw_snr": 2.7,
               "offset_ch": 5,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0013)"
             },
@@ -1145,10 +1264,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1091.3,
-              "snr": 0.9,
-              "raw_snr": 2.4,
+              "snr": 0.93,
+              "raw_snr": 2.5,
               "offset_ch": 2,
-              "search_chans": 10,
+              "search_chans": 7,
               "present": false,
               "label": "OFF_2 (Scan 0014)"
             },
@@ -1156,10 +1275,10 @@
               "scan": 4,
               "role": "ON",
               "dt_s": 1405.3,
-              "snr": 2.03,
-              "raw_snr": 2.7,
-              "offset_ch": -11,
-              "search_chans": 11,
+              "snr": 1.89,
+              "raw_snr": 2.5,
+              "offset_ch": 4,
+              "search_chans": 8,
               "present": false,
               "label": "ON_3 (Scan 0015)"
             },
@@ -1170,7 +1289,7 @@
               "snr": 1.34,
               "raw_snr": 3.1,
               "offset_ch": 9,
-              "search_chans": 12,
+              "search_chans": 9,
               "present": false,
               "label": "OFF_3 (Scan 0016)"
             }
@@ -1183,6 +1302,10 @@
         "peak_freq_mhz": 2185.909652709961,
         "drift_rate_hz_s": 0.0,
         "t_ref_mjd": 58100.91569444445,
+        "drift_bins": 0,
+        "max_drift_bins": 6,
+        "ref_span_s": 298.500227072,
+        "ref_foff_hz": 2861.02294921875,
         "off_drift_snr": 98974.5
       },
       "on_file": "spliced_blc0001020304050607_guppi_58100_78802_OUMUAMUA_0011.gpuspec.0002.h5",
@@ -1237,6 +1360,10 @@
             "peak_freq_mhz": 2185.909652709961,
             "drift_rate_hz_s": 0.0,
             "t_ref_mjd": 58100.91569444445,
+            "drift_bins": 0,
+            "max_drift_bins": 6,
+            "ref_span_s": 298.500227072,
+            "ref_foff_hz": 2861.02294921875,
             "off_drift_snr": 98974.5,
             "cadence_scans": [
               {
@@ -1246,7 +1373,7 @@
                 "snr": 64397.76,
                 "raw_snr": 62264.8,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "ON_1 (Scan 0011)"
               },
@@ -1257,7 +1384,7 @@
                 "snr": 98974.49,
                 "raw_snr": 90784.1,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "OFF_1 (Scan 0012)"
               },
@@ -1268,7 +1395,7 @@
                 "snr": 82987.53,
                 "raw_snr": 82202.5,
                 "offset_ch": 0,
-                "search_chans": 8,
+                "search_chans": 5,
                 "present": true,
                 "label": "ON_2 (Scan 0013)"
               },
@@ -1279,7 +1406,7 @@
                 "snr": 203654.12,
                 "raw_snr": 162367.8,
                 "offset_ch": 0,
-                "search_chans": 9,
+                "search_chans": 6,
                 "present": true,
                 "label": "OFF_2 (Scan 0014)"
               },
@@ -1290,7 +1417,7 @@
                 "snr": 123584.58,
                 "raw_snr": 114295.3,
                 "offset_ch": 0,
-                "search_chans": 10,
+                "search_chans": 7,
                 "present": true,
                 "label": "ON_3 (Scan 0015)"
               },
@@ -1301,7 +1428,7 @@
                 "snr": 150608.51,
                 "raw_snr": 148999.3,
                 "offset_ch": 0,
-                "search_chans": 11,
+                "search_chans": 8,
                 "present": true,
                 "label": "OFF_3 (Scan 0016)"
               }
@@ -1331,8 +1458,8 @@
       },
       "n_tiles_evaluated": 256,
       "n_channels_evaluated": 65536,
-      "elapsed_s": 0.97,
-      "throughput_mchans_s": 3.71,
+      "elapsed_s": 0.99,
+      "throughput_mchans_s": 3.66,
       "max_weirdness_score": 5.3,
       "median_weirdness_score": 0.06,
       "rfi_vetoed_tiles": 104,
@@ -1350,6 +1477,9 @@
           "drift_bins": 9,
           "drift_rate_hz_s": 444.089,
           "t_ref_mjd": 57807.87644675926,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 76.42,
           "kurtosis": 24.94,
           "ts_max": 20.46,
@@ -1377,7 +1507,7 @@
               "snr": 3.46,
               "raw_snr": 7.1,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": false,
               "label": "ON_1 (Scan 0015)"
             },
@@ -1385,10 +1515,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 109.0,
-              "snr": 2.84,
-              "raw_snr": 7.1,
-              "offset_ch": 8,
-              "search_chans": 8,
+              "snr": 2.15,
+              "raw_snr": 6.7,
+              "offset_ch": 5,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0016)"
             },
@@ -1396,10 +1526,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 189.0,
-              "snr": 1.23,
-              "raw_snr": 1.7,
-              "offset_ch": 9,
-              "search_chans": 10,
+              "snr": 0.75,
+              "raw_snr": 1.4,
+              "offset_ch": 6,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0017)"
             },
@@ -1407,10 +1537,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 269.0,
-              "snr": 0.18,
-              "raw_snr": 2.2,
-              "offset_ch": 9,
-              "search_chans": 11,
+              "snr": -0.15,
+              "raw_snr": 1.9,
+              "offset_ch": 6,
+              "search_chans": 8,
               "present": false,
               "label": "OFF_2 (Scan 0018)"
             }
@@ -1428,6 +1558,9 @@
           "drift_bins": 4,
           "drift_rate_hz_s": 197.373,
           "t_ref_mjd": 57807.87644675926,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 79.71,
           "kurtosis": 28.56,
           "ts_max": 15.14,
@@ -1455,7 +1588,7 @@
               "snr": 3.69,
               "raw_snr": 5.3,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": false,
               "label": "ON_1 (Scan 0015)"
             },
@@ -1463,10 +1596,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 109.0,
-              "snr": 1.61,
-              "raw_snr": 6.6,
-              "offset_ch": -6,
-              "search_chans": 8,
+              "snr": 1.27,
+              "raw_snr": 6.3,
+              "offset_ch": -3,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0016)"
             },
@@ -1474,10 +1607,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 189.0,
-              "snr": 0.81,
+              "snr": 0.78,
               "raw_snr": 3.4,
-              "offset_ch": -7,
-              "search_chans": 10,
+              "offset_ch": -4,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0017)"
             },
@@ -1485,10 +1618,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 269.0,
-              "snr": 1.41,
-              "raw_snr": 3.4,
-              "offset_ch": -10,
-              "search_chans": 11,
+              "snr": 0.87,
+              "raw_snr": 2.8,
+              "offset_ch": -7,
+              "search_chans": 8,
               "present": false,
               "label": "OFF_2 (Scan 0018)"
             }
@@ -1506,6 +1639,9 @@
           "drift_bins": 10,
           "drift_rate_hz_s": 493.432,
           "t_ref_mjd": 57807.87644675926,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 69.94,
           "kurtosis": 18.69,
           "ts_max": 41.17,
@@ -1524,16 +1660,16 @@
           "classification": "Pulsed / Transient Narrowband Burst",
           "plot_path": "E:\\seti_staging\\results\\plots\\trappist1_exoplanets_rank03_2216.2442MHz.png",
           "cadence_verdict": "NOT-RECOVERED",
-          "cadence_detail": "in 0/2 ON, 0/2 OFF",
+          "cadence_detail": "in 0/2 ON, 0/2 OFF, drift refined +10 -> +11 bins",
           "cadence_scans": [
             {
               "scan": 0,
               "role": "ON",
               "dt_s": 29.0,
-              "snr": 6.14,
-              "raw_snr": 21.8,
+              "snr": 6.79,
+              "raw_snr": 22.4,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": false,
               "label": "ON_1 (Scan 0015)"
             },
@@ -1541,10 +1677,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 109.0,
-              "snr": -8.41,
+              "snr": -8.24,
               "raw_snr": 0.0,
-              "offset_ch": -4,
-              "search_chans": 8,
+              "offset_ch": -5,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0016)"
             },
@@ -1552,10 +1688,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 189.0,
-              "snr": -1.42,
+              "snr": -1.56,
               "raw_snr": 0.0,
-              "offset_ch": -10,
-              "search_chans": 10,
+              "offset_ch": -6,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0017)"
             },
@@ -1563,14 +1699,25 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 269.0,
-              "snr": 1.25,
-              "raw_snr": 2.9,
+              "snr": 3.34,
+              "raw_snr": 6.1,
               "offset_ch": 8,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "OFF_2 (Scan 0018)"
             }
-          ]
+          ],
+          "cadence_drift_refined": {
+            "from": {
+              "drift_bins": 10,
+              "peak_freq_mhz": 2216.244221
+            },
+            "to": {
+              "drift_bins": 11,
+              "drift_rate_hz_s": 542.776,
+              "peak_freq_mhz": 2216.2442207336426
+            }
+          }
         },
         {
           "tile_idx": 146,
@@ -1584,6 +1731,9 @@
           "drift_bins": -8,
           "drift_rate_hz_s": -394.746,
           "t_ref_mjd": 57807.87644675926,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 67.3,
           "kurtosis": 23.62,
           "ts_max": 16.21,
@@ -1611,7 +1761,7 @@
               "snr": 3.18,
               "raw_snr": 6.1,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": false,
               "label": "ON_1 (Scan 0015)"
             },
@@ -1619,10 +1769,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 109.0,
-              "snr": 0.44,
-              "raw_snr": 5.1,
-              "offset_ch": 6,
-              "search_chans": 8,
+              "snr": 0.26,
+              "raw_snr": 4.9,
+              "offset_ch": 1,
+              "search_chans": 5,
               "present": false,
               "label": "OFF_1 (Scan 0016)"
             },
@@ -1630,10 +1780,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 189.0,
-              "snr": 1.34,
-              "raw_snr": 2.1,
-              "offset_ch": -10,
-              "search_chans": 10,
+              "snr": 0.62,
+              "raw_snr": 1.7,
+              "offset_ch": -4,
+              "search_chans": 6,
               "present": false,
               "label": "ON_2 (Scan 0017)"
             },
@@ -1644,7 +1794,7 @@
               "snr": 1.36,
               "raw_snr": 2.1,
               "offset_ch": 1,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "OFF_2 (Scan 0018)"
             }
@@ -1657,6 +1807,10 @@
         "peak_freq_mhz": 2250.296115875244,
         "drift_rate_hz_s": 0.0,
         "t_ref_mjd": 57807.87737268519,
+        "drift_bins": 0,
+        "max_drift_bins": 6,
+        "ref_span_s": 57.98205849599999,
+        "ref_foff_hz": 2861.02294921875,
         "off_drift_snr": 3861.56
       },
       "on_file": "blc00_guppi_57807_75725_DIAG_TRAPPIST1_0015.gpuspec.0002.fil",
@@ -1700,6 +1854,10 @@
             "peak_freq_mhz": 2250.296115875244,
             "drift_rate_hz_s": 0.0,
             "t_ref_mjd": 57807.87737268519,
+            "drift_bins": 0,
+            "max_drift_bins": 6,
+            "ref_span_s": 57.98205849599999,
+            "ref_foff_hz": 2861.02294921875,
             "off_drift_snr": 3861.56,
             "cadence_scans": [
               {
@@ -1709,7 +1867,7 @@
                 "snr": 6779.63,
                 "raw_snr": 19280.8,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "ON_1 (Scan 0015)"
               },
@@ -1720,7 +1878,7 @@
                 "snr": 3861.56,
                 "raw_snr": 10311.3,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "OFF_1 (Scan 0016)"
               },
@@ -1731,7 +1889,7 @@
                 "snr": 1709.82,
                 "raw_snr": 7609.7,
                 "offset_ch": 0,
-                "search_chans": 8,
+                "search_chans": 5,
                 "present": true,
                 "label": "ON_2 (Scan 0017)"
               },
@@ -1742,7 +1900,7 @@
                 "snr": 4510.26,
                 "raw_snr": 14716.2,
                 "offset_ch": 0,
-                "search_chans": 10,
+                "search_chans": 6,
                 "present": true,
                 "label": "OFF_2 (Scan 0018)"
               }
@@ -1772,8 +1930,8 @@
       },
       "n_tiles_evaluated": 1232,
       "n_channels_evaluated": 315392,
-      "elapsed_s": 2.61,
-      "throughput_mchans_s": 6.66,
+      "elapsed_s": 2.67,
+      "throughput_mchans_s": 6.5,
       "max_weirdness_score": 132.62,
       "median_weirdness_score": 0.01,
       "rfi_vetoed_tiles": 0,
@@ -1791,6 +1949,9 @@
           "drift_bins": 1,
           "drift_rate_hz_s": 49.343,
           "t_ref_mjd": 58331.14252314815,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 0.0,
           "kurtosis": -0.52,
           "ts_max": 1217.51,
@@ -1818,7 +1979,7 @@
               "snr": 8389.45,
               "raw_snr": 7203.7,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0013)"
             },
@@ -1826,10 +1987,10 @@
               "scan": 1,
               "role": "ON",
               "dt_s": 368.0,
-              "snr": 13515.49,
-              "raw_snr": 18429.7,
-              "offset_ch": -7,
-              "search_chans": 7,
+              "snr": 14682.74,
+              "raw_snr": 20021.3,
+              "offset_ch": -8,
+              "search_chans": 14,
               "present": true,
               "label": "ON_2 (Scan 0014, same pointing)"
             }
@@ -1847,6 +2008,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 58331.14252314815,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 0.0,
           "kurtosis": -1.57,
           "ts_max": 1104.25,
@@ -1874,7 +2038,7 @@
               "snr": 6527.21,
               "raw_snr": 6945.9,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0013)"
             },
@@ -1885,7 +2049,7 @@
               "snr": 10622.26,
               "raw_snr": 10362.7,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 14,
               "present": true,
               "label": "ON_2 (Scan 0014, same pointing)"
             }
@@ -1903,6 +2067,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 58331.14252314815,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 0.0,
           "kurtosis": -0.89,
           "ts_max": 683.34,
@@ -1930,7 +2097,7 @@
               "snr": 4364.07,
               "raw_snr": 4069.6,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0013)"
             },
@@ -1941,7 +2108,7 @@
               "snr": 11394.4,
               "raw_snr": 13319.4,
               "offset_ch": -1,
-              "search_chans": 7,
+              "search_chans": 14,
               "present": true,
               "label": "ON_2 (Scan 0014, same pointing)"
             }
@@ -1959,6 +2126,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 58331.14252314815,
+          "max_drift_bins": 10,
+          "ref_span_s": 57.98205849599999,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 325.02,
           "kurtosis": 50.0,
           "ts_max": 664.64,
@@ -1986,7 +2156,7 @@
               "snr": 105.83,
               "raw_snr": 90.6,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "ON_1 (Scan 0013)"
             },
@@ -1997,7 +2167,7 @@
               "snr": 171.59,
               "raw_snr": 136.7,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 14,
               "present": true,
               "label": "ON_2 (Scan 0014, same pointing)"
             }
@@ -2050,8 +2220,8 @@
       },
       "n_tiles_evaluated": 1372,
       "n_channels_evaluated": 351232,
-      "elapsed_s": 27.37,
-      "throughput_mchans_s": 3.5,
+      "elapsed_s": 29.47,
+      "throughput_mchans_s": 3.25,
       "max_weirdness_score": 8.2,
       "median_weirdness_score": 0.01,
       "rfi_vetoed_tiles": 154,
@@ -2069,6 +2239,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 57635.40480324074,
+          "max_drift_bins": 10,
+          "ref_span_s": 292.05777612799994,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 154.34,
           "kurtosis": 61.63,
           "ts_max": 20.91,
@@ -2096,7 +2269,7 @@
               "snr": 4.2,
               "raw_snr": 4.9,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": false,
               "label": "GJ 144 (Scan 0003)"
             },
@@ -2107,7 +2280,7 @@
               "snr": 3.57,
               "raw_snr": 4.2,
               "offset_ch": 0,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "HIP 15477 (Scan 0004)"
             },
@@ -2118,7 +2291,7 @@
               "snr": 3.77,
               "raw_snr": 4.9,
               "offset_ch": -5,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": false,
               "label": "GJ 144 (Scan 0005)"
             },
@@ -2129,7 +2302,7 @@
               "snr": 3.02,
               "raw_snr": 3.9,
               "offset_ch": 0,
-              "search_chans": 11,
+              "search_chans": 7,
               "present": false,
               "label": "HIP 15480 (Scan 0006)"
             },
@@ -2140,7 +2313,7 @@
               "snr": 2.48,
               "raw_snr": 2.8,
               "offset_ch": 0,
-              "search_chans": 12,
+              "search_chans": 8,
               "present": false,
               "label": "GJ 144 (Scan 0007)"
             },
@@ -2151,7 +2324,7 @@
               "snr": 3.13,
               "raw_snr": 4.0,
               "offset_ch": 8,
-              "search_chans": 13,
+              "search_chans": 9,
               "present": false,
               "label": "HIP 15598 (Scan 0008)"
             }
@@ -2169,6 +2342,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 57635.40480324074,
+          "max_drift_bins": 10,
+          "ref_span_s": 292.05777612799994,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 0.0,
           "kurtosis": -0.83,
           "ts_max": 3505.0,
@@ -2196,7 +2372,7 @@
               "snr": 73001.44,
               "raw_snr": 49160.5,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "GJ 144 (Scan 0003)"
             },
@@ -2207,7 +2383,7 @@
               "snr": 22238.97,
               "raw_snr": 30680.7,
               "offset_ch": 0,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": true,
               "label": "HIP 15477 (Scan 0004)"
             },
@@ -2218,7 +2394,7 @@
               "snr": 16614.23,
               "raw_snr": 32133.8,
               "offset_ch": 0,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": true,
               "label": "GJ 144 (Scan 0005)"
             },
@@ -2229,7 +2405,7 @@
               "snr": 14984.6,
               "raw_snr": 22100.9,
               "offset_ch": 0,
-              "search_chans": 11,
+              "search_chans": 7,
               "present": true,
               "label": "HIP 15480 (Scan 0006)"
             },
@@ -2240,7 +2416,7 @@
               "snr": 15120.8,
               "raw_snr": 31805.9,
               "offset_ch": 0,
-              "search_chans": 12,
+              "search_chans": 8,
               "present": true,
               "label": "GJ 144 (Scan 0007)"
             },
@@ -2251,7 +2427,7 @@
               "snr": 10131.83,
               "raw_snr": 8536.8,
               "offset_ch": 0,
-              "search_chans": 13,
+              "search_chans": 9,
               "present": true,
               "label": "HIP 15598 (Scan 0008)"
             }
@@ -2269,6 +2445,9 @@
           "drift_bins": -3,
           "drift_rate_hz_s": -29.388,
           "t_ref_mjd": 57635.40480324074,
+          "max_drift_bins": 10,
+          "ref_span_s": 292.05777612799994,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 1.07,
           "kurtosis": 0.34,
           "ts_max": 22.6,
@@ -2296,7 +2475,7 @@
               "snr": 54.58,
               "raw_snr": 56.8,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "GJ 144 (Scan 0003)"
             },
@@ -2307,7 +2486,7 @@
               "snr": 3.58,
               "raw_snr": 3.7,
               "offset_ch": -1,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "HIP 15477 (Scan 0004)"
             },
@@ -2315,10 +2494,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 828.0,
-              "snr": 3.41,
-              "raw_snr": 3.2,
-              "offset_ch": 7,
-              "search_chans": 9,
+              "snr": 2.39,
+              "raw_snr": 2.2,
+              "offset_ch": 6,
+              "search_chans": 6,
               "present": false,
               "label": "GJ 144 (Scan 0005)"
             },
@@ -2326,10 +2505,10 @@
               "scan": 3,
               "role": "OFF",
               "dt_s": 1169.0,
-              "snr": 336.69,
-              "raw_snr": 462.7,
-              "offset_ch": -11,
-              "search_chans": 11,
+              "snr": 247.26,
+              "raw_snr": 344.2,
+              "offset_ch": 1,
+              "search_chans": 7,
               "present": true,
               "label": "HIP 15480 (Scan 0006)"
             },
@@ -2340,7 +2519,7 @@
               "snr": 2.3,
               "raw_snr": 2.3,
               "offset_ch": -2,
-              "search_chans": 12,
+              "search_chans": 8,
               "present": false,
               "label": "GJ 144 (Scan 0007)"
             },
@@ -2348,10 +2527,10 @@
               "scan": 5,
               "role": "OFF",
               "dt_s": 1851.0,
-              "snr": 1.91,
-              "raw_snr": 1.9,
-              "offset_ch": -11,
-              "search_chans": 13,
+              "snr": 1.43,
+              "raw_snr": 1.4,
+              "offset_ch": 6,
+              "search_chans": 9,
               "present": false,
               "label": "HIP 15598 (Scan 0008)"
             }
@@ -2369,6 +2548,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 57635.40480324074,
+          "max_drift_bins": 10,
+          "ref_span_s": 292.05777612799994,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 0.0,
           "kurtosis": -0.45,
           "ts_max": 2.24,
@@ -2396,7 +2578,7 @@
               "snr": 37.58,
               "raw_snr": 15.2,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "GJ 144 (Scan 0003)"
             },
@@ -2407,7 +2589,7 @@
               "snr": 2.13,
               "raw_snr": 0.1,
               "offset_ch": 3,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "HIP 15477 (Scan 0004)"
             },
@@ -2418,7 +2600,7 @@
               "snr": 19.6,
               "raw_snr": -2.4,
               "offset_ch": 3,
-              "search_chans": 9,
+              "search_chans": 6,
               "present": true,
               "label": "GJ 144 (Scan 0005)"
             },
@@ -2429,7 +2611,7 @@
               "snr": 15.95,
               "raw_snr": 6.2,
               "offset_ch": -2,
-              "search_chans": 11,
+              "search_chans": 7,
               "present": true,
               "label": "HIP 15480 (Scan 0006)"
             },
@@ -2437,10 +2619,10 @@
               "scan": 4,
               "role": "ON",
               "dt_s": 1511.0,
-              "snr": 0.07,
-              "raw_snr": 5.4,
-              "offset_ch": -11,
-              "search_chans": 12,
+              "snr": -0.22,
+              "raw_snr": 5.1,
+              "offset_ch": 6,
+              "search_chans": 8,
               "present": false,
               "label": "GJ 144 (Scan 0007)"
             },
@@ -2451,7 +2633,7 @@
               "snr": -0.44,
               "raw_snr": 20.0,
               "offset_ch": 9,
-              "search_chans": 13,
+              "search_chans": 9,
               "present": false,
               "label": "HIP 15598 (Scan 0008)"
             }
@@ -2464,6 +2646,10 @@
         "peak_freq_mhz": 2195.499801635742,
         "drift_rate_hz_s": 0.0,
         "t_ref_mjd": 57635.40875,
+        "drift_bins": 0,
+        "max_drift_bins": 6,
+        "ref_span_s": 292.05777612799994,
+        "ref_foff_hz": 2861.02294921875,
         "off_drift_snr": 22238.97
       },
       "on_file": "spliced_blc0001020304050607_guppi_57635_34975_Gj144_0003.gpuspec.0002.h5",
@@ -2518,6 +2704,10 @@
             "peak_freq_mhz": 2195.499801635742,
             "drift_rate_hz_s": 0.0,
             "t_ref_mjd": 57635.40875,
+            "drift_bins": 0,
+            "max_drift_bins": 6,
+            "ref_span_s": 292.05777612799994,
+            "ref_foff_hz": 2861.02294921875,
             "off_drift_snr": 22238.97,
             "cadence_scans": [
               {
@@ -2527,7 +2717,7 @@
                 "snr": 73001.44,
                 "raw_snr": 49160.5,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "GJ 144 (Scan 0003)"
               },
@@ -2538,7 +2728,7 @@
                 "snr": 22238.97,
                 "raw_snr": 30680.7,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "HIP 15477 (Scan 0004)"
               },
@@ -2549,7 +2739,7 @@
                 "snr": 16614.23,
                 "raw_snr": 32133.8,
                 "offset_ch": 0,
-                "search_chans": 8,
+                "search_chans": 5,
                 "present": true,
                 "label": "GJ 144 (Scan 0005)"
               },
@@ -2560,7 +2750,7 @@
                 "snr": 14984.6,
                 "raw_snr": 22100.9,
                 "offset_ch": 0,
-                "search_chans": 9,
+                "search_chans": 6,
                 "present": true,
                 "label": "HIP 15480 (Scan 0006)"
               },
@@ -2571,7 +2761,7 @@
                 "snr": 15120.8,
                 "raw_snr": 31805.9,
                 "offset_ch": 0,
-                "search_chans": 11,
+                "search_chans": 7,
                 "present": true,
                 "label": "GJ 144 (Scan 0007)"
               },
@@ -2582,7 +2772,7 @@
                 "snr": 10131.83,
                 "raw_snr": 8536.8,
                 "offset_ch": 0,
-                "search_chans": 12,
+                "search_chans": 8,
                 "present": true,
                 "label": "HIP 15598 (Scan 0008)"
               }
@@ -2612,8 +2802,8 @@
       },
       "n_tiles_evaluated": 1232,
       "n_channels_evaluated": 315392,
-      "elapsed_s": 24.04,
-      "throughput_mchans_s": 3.66,
+      "elapsed_s": 24.69,
+      "throughput_mchans_s": 3.56,
       "max_weirdness_score": 17.56,
       "median_weirdness_score": 0.03,
       "rfi_vetoed_tiles": 327,
@@ -2631,6 +2821,9 @@
           "drift_bins": 4,
           "drift_rate_hz_s": 38.339,
           "t_ref_mjd": 58202.497719907406,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 251.02,
           "kurtosis": 265.6,
           "ts_max": 150.55,
@@ -2658,7 +2851,7 @@
               "snr": 12.11,
               "raw_snr": 11.5,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "Kepler-992b (Scan 0010)"
             },
@@ -2666,10 +2859,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 506.3,
-              "snr": 1.85,
-              "raw_snr": 1.9,
-              "offset_ch": -8,
-              "search_chans": 8,
+              "snr": 1.12,
+              "raw_snr": 1.2,
+              "offset_ch": 0,
+              "search_chans": 5,
               "present": false,
               "label": "Kepler-738b (Scan 0011)"
             },
@@ -2680,7 +2873,7 @@
               "snr": 2.47,
               "raw_snr": 3.0,
               "offset_ch": 1,
-              "search_chans": 10,
+              "search_chans": 6,
               "present": false,
               "label": "Kepler-992b (Scan 0012)"
             },
@@ -2691,7 +2884,7 @@
               "snr": -0.64,
               "raw_snr": 12.0,
               "offset_ch": -7,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "Kepler-738b (Scan 0013)"
             }
@@ -2709,6 +2902,9 @@
           "drift_bins": -1,
           "drift_rate_hz_s": -9.585,
           "t_ref_mjd": 58202.497719907406,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 191.49,
           "kurtosis": 54.78,
           "ts_max": 45.14,
@@ -2736,7 +2932,7 @@
               "snr": 10.2,
               "raw_snr": 17.2,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "Kepler-992b (Scan 0010)"
             },
@@ -2744,10 +2940,10 @@
               "scan": 1,
               "role": "OFF",
               "dt_s": 506.3,
-              "snr": 3.44,
-              "raw_snr": 15.8,
-              "offset_ch": 7,
-              "search_chans": 8,
+              "snr": 2.01,
+              "raw_snr": 10.3,
+              "offset_ch": 5,
+              "search_chans": 5,
               "present": false,
               "label": "Kepler-738b (Scan 0011)"
             },
@@ -2755,10 +2951,10 @@
               "scan": 2,
               "role": "ON",
               "dt_s": 994.3,
-              "snr": 4.25,
-              "raw_snr": 34.4,
-              "offset_ch": 9,
-              "search_chans": 10,
+              "snr": 1.88,
+              "raw_snr": 24.2,
+              "offset_ch": 1,
+              "search_chans": 6,
               "present": false,
               "label": "Kepler-992b (Scan 0012)"
             },
@@ -2769,7 +2965,7 @@
               "snr": 5.62,
               "raw_snr": 55.5,
               "offset_ch": 8,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "Kepler-738b (Scan 0013)"
             }
@@ -2787,6 +2983,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 58202.497719907406,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 190.99,
           "kurtosis": 88.17,
           "ts_max": 44.95,
@@ -2814,7 +3013,7 @@
               "snr": 12.2,
               "raw_snr": 18.1,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "Kepler-992b (Scan 0010)"
             },
@@ -2825,7 +3024,7 @@
               "snr": 5.74,
               "raw_snr": 32.4,
               "offset_ch": 4,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "Kepler-738b (Scan 0011)"
             },
@@ -2836,7 +3035,7 @@
               "snr": 3.67,
               "raw_snr": 7.1,
               "offset_ch": 5,
-              "search_chans": 10,
+              "search_chans": 6,
               "present": false,
               "label": "Kepler-992b (Scan 0012)"
             },
@@ -2847,7 +3046,7 @@
               "snr": 2.97,
               "raw_snr": 11.3,
               "offset_ch": 0,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": false,
               "label": "Kepler-738b (Scan 0013)"
             }
@@ -2865,6 +3064,9 @@
           "drift_bins": 0,
           "drift_rate_hz_s": 0.0,
           "t_ref_mjd": 58202.497719907406,
+          "max_drift_bins": 10,
+          "ref_span_s": 298.500227072,
+          "ref_foff_hz": 2861.02294921875,
           "burst_score": 137.12,
           "kurtosis": 40.41,
           "ts_max": 28.93,
@@ -2892,7 +3094,7 @@
               "snr": 11.65,
               "raw_snr": 10.1,
               "offset_ch": 0,
-              "search_chans": 7,
+              "search_chans": 3,
               "present": true,
               "label": "Kepler-992b (Scan 0010)"
             },
@@ -2903,7 +3105,7 @@
               "snr": 5.98,
               "raw_snr": 6.3,
               "offset_ch": 0,
-              "search_chans": 8,
+              "search_chans": 5,
               "present": false,
               "label": "Kepler-738b (Scan 0011)"
             },
@@ -2914,7 +3116,7 @@
               "snr": 6.02,
               "raw_snr": 7.0,
               "offset_ch": 0,
-              "search_chans": 10,
+              "search_chans": 6,
               "present": false,
               "label": "Kepler-992b (Scan 0012)"
             },
@@ -2925,7 +3127,7 @@
               "snr": 10.13,
               "raw_snr": 14.8,
               "offset_ch": 0,
-              "search_chans": 11,
+              "search_chans": 8,
               "present": true,
               "label": "Kepler-738b (Scan 0013)"
             }
@@ -2938,6 +3140,10 @@
         "peak_freq_mhz": 1686.598777770996,
         "drift_rate_hz_s": 0.0,
         "t_ref_mjd": 58202.501851851855,
+        "drift_bins": 0,
+        "max_drift_bins": 6,
+        "ref_span_s": 298.500227072,
+        "ref_foff_hz": 2861.02294921875,
         "off_drift_snr": 7957.8
       },
       "on_file": "spliced_blc1011121314151617_guppi_58202_43003_kepler992b_0010.gpuspec.0002.h5",
@@ -2982,6 +3188,10 @@
             "peak_freq_mhz": 1686.598777770996,
             "drift_rate_hz_s": 0.0,
             "t_ref_mjd": 58202.501851851855,
+            "drift_bins": 0,
+            "max_drift_bins": 6,
+            "ref_span_s": 298.500227072,
+            "ref_foff_hz": 2861.02294921875,
             "off_drift_snr": 7957.8,
             "cadence_scans": [
               {
@@ -2991,7 +3201,7 @@
                 "snr": 4811.97,
                 "raw_snr": 4417.9,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "Kepler-992b (Scan 0010)"
               },
@@ -3002,7 +3212,7 @@
                 "snr": 7957.8,
                 "raw_snr": 8089.2,
                 "offset_ch": 0,
-                "search_chans": 7,
+                "search_chans": 3,
                 "present": true,
                 "label": "Kepler-738b (Scan 0011)"
               },
@@ -3013,7 +3223,7 @@
                 "snr": 3786.56,
                 "raw_snr": 3217.5,
                 "offset_ch": 0,
-                "search_chans": 9,
+                "search_chans": 5,
                 "present": true,
                 "label": "Kepler-992b (Scan 0012)"
               },
@@ -3024,7 +3234,7 @@
                 "snr": 3199.92,
                 "raw_snr": 3609.5,
                 "offset_ch": 0,
-                "search_chans": 10,
+                "search_chans": 6,
                 "present": true,
                 "label": "Kepler-738b (Scan 0013)"
               }
