@@ -3,3 +3,4 @@ __pycache__/
 # 20 MB generated output (base64 plots); regenerate with run_survey.py
 dashboard.html
 *.bak-*
+.superpowers/
