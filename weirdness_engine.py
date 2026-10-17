@@ -851,6 +851,36 @@ def cadence_verdict(scans: list[dict]) -> tuple[str, str]:
     return "PARTIAL", detail
 
 
+BANK_EDGE_REFINE_FACTOR = 4  # re-search drift out to this many times the Stage 1 bank limit
+BANK_EDGE_START_CHANS = 3    # and the start channel within +/- this many channels
+
+
+def refine_bank_edge_drift(z: np.ndarray, freqs: np.ndarray, hdr: dict, sig: dict, tile_width: int = 256) -> None:
+    """
+    sig sits at the edge of Stage 1's drift bank (|drift_bins| == max_drift_bins), so its true
+    drift may be larger. In its reference scan, try every drift from the bank limit out to
+    BANK_EDGE_REFINE_FACTOR times it (same sign) and start channels within
+    +/-BANK_EDGE_START_CHANS, and keep the best calibrated SNR. Updates sig in place
+    (drift_bins, drift_rate_hz_s, peak_freq_mhz) and records drift_refined_from.
+    """
+    s0 = int(sig["drift_bins"])
+    sign = 1 if s0 > 0 else -1
+    best = None
+    for s in range(abs(s0), BANK_EDGE_REFINE_FACTOR * int(sig["max_drift_bins"]) + 1):
+        trial = dict(sig, drift_bins=sign * s)
+        m = drift_aligned_snr(z, freqs, hdr, trial, BANK_EDGE_START_CHANS, tile_width=tile_width)
+        if m is not None and (best is None or m["snr"] > best[0]):
+            best = (m["snr"], sign * s, m["offset_ch"])
+    if best is None or (best[1] == s0 and best[2] == 0):
+        return
+    df_mhz = float(freqs[1] - freqs[0])
+    c_ref = int(np.rint((sig["peak_freq_mhz"] - freqs[0]) / df_mhz))
+    sig["drift_refined_from"] = {"drift_bins": s0, "peak_freq_mhz": sig["peak_freq_mhz"]}
+    sig["drift_bins"] = best[1]
+    sig["drift_rate_hz_s"] = round(best[1] * sig.get("ref_foff_hz", hdr["foff_hz"]) / sig["ref_span_s"], 3)
+    sig["peak_freq_mhz"] = float(freqs[c_ref + best[2]])
+
+
 def cadence_test_signals(
     scan_loader,
     roles: list[str],
@@ -865,12 +895,32 @@ def cadence_test_signals(
     Each signal needs peak_freq_mhz, drift_rate_hz_s and t_ref_mjd, and gets back
     "cadence_scans", "cadence_verdict" and "cadence_detail".
     """
-    rows = [[] for _ in signals]
-    for i, role in enumerate(roles):
+    def load_z(i):
         data, freqs, hdr = scan_loader(i)
         z, usable = normalize_bandpass(data, tile_width=tile_width)
-        del data
-        freqs = freqs[:usable]
+        return z, freqs[:usable], hdr
+
+    # Signals at the edge of Stage 1's drift bank may drift faster than it can say: re-search
+    # their drift in their reference scan before predicting any other scan (Codex bug 4).
+    signals = [dict(s) for s in signals]
+    edge = [j for j, s in enumerate(signals)
+            if "drift_bins" in s and "max_drift_bins" in s and abs(s["drift_bins"]) >= s["max_drift_bins"]]
+    cache = {}  # reference scans loaded for refinement, reused by the main loop
+    pending = set(edge) if method == "dedoppler" else set()
+    for i in range(len(roles)):
+        if not pending:
+            break
+        loaded = load_z(i)
+        hits = {j for j in pending if abs(loaded[2]["tstart_mjd"] - signals[j]["t_ref_mjd"]) < 1e-9}
+        for j in hits:
+            refine_bank_edge_drift(*loaded, signals[j], tile_width=tile_width)
+        if hits:
+            cache[i] = loaded
+        pending -= hits
+
+    rows = [[] for _ in signals]
+    for i, role in enumerate(roles):
+        z, freqs, hdr = cache.pop(i) if i in cache else load_z(i)
         span = track_span_s(hdr, z.shape[0])
         for j, sig in enumerate(signals):
             dt = (hdr["tstart_mjd"] - sig["t_ref_mjd"]) * 86400.0 + 0.5 * span
@@ -976,14 +1026,16 @@ def run_synthetic_cadence_benchmark(
             "stage1_drift_snr": got["drift_snr"] if got else None,
             "ok": bool(got) and got["cadence_verdict"] == expected,
         }
+    # bank-edge signals whose drift the cadence check refined measure a different track
+    unrefined = [s for s in tested[:-1] if "drift_refined_from" not in s]
     diffs = {s["tile_idx"]: round(s["cadence_scans"][0]["snr"] - s["drift_snr"], 2)
-             for s in tested[:-1] if s["cadence_scans"][0]["snr"] is not None}
+             for s in unrefined if s["cadence_scans"][0]["snr"] is not None}
     max_diff = max((abs(d) for d in diffs.values()), default=float("inf"))
     checks["on1_snr_agreement"] = {
-        "expected": f"|cadence ON_1 SNR - Stage 1 drift_snr| <= {SNR_AGREEMENT_TOL} for all {len(tested) - 1}",
-        "got": f"max {max_diff:.2f} over {len(diffs)}",
+        "expected": f"|cadence ON_1 SNR - Stage 1 drift_snr| <= {SNR_AGREEMENT_TOL} for all {len(unrefined)} unrefined",
+        "got": f"max {max_diff:.2f} over {len(diffs)} ({len(tested) - 1 - len(unrefined)} refined)",
         "diff_by_tile": diffs,
-        "ok": len(diffs) == len(tested) - 1 and max_diff <= SNR_AGREEMENT_TOL,
+        "ok": len(diffs) == len(unrefined) and len(unrefined) >= 6 and max_diff <= SNR_AGREEMENT_TOL,
     }
     return {
         "passed": all(c["ok"] for c in checks.values()),

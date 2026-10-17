@@ -64,6 +64,13 @@ def run_cadence_check(cadence: dict, summary: dict, scan_paths: list[str], metho
         cand["cadence_verdict"] = res["cadence_verdict"]
         cand["cadence_detail"] = res["cadence_detail"]
         cand["cadence_scans"] = res["cadence_scans"]
+        if "drift_refined_from" in res:  # Stage 1 drift was at its bank edge; see refine_bank_edge_drift
+            cand["cadence_drift_refined"] = {
+                "from": res["drift_refined_from"],
+                "to": {k: res[k] for k in ("drift_bins", "drift_rate_hz_s", "peak_freq_mhz")},
+            }
+            cand["cadence_detail"] += (f", drift refined {res['drift_refined_from']['drift_bins']:+d}"
+                                       f" -> {res['drift_bins']:+d} bins")
     control_results = tested[len(summary["candidates"]):]
     for res in control_results:
         for row in res["cadence_scans"]:
