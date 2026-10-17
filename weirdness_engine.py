@@ -165,13 +165,15 @@ def compute_dedoppler_snr(
     best_chan = np.zeros(N_tiles, dtype=np.int32)
 
     shifts = range(-max_shift_bins, max_shift_bins + 1)
-    t_idx = np.arange(T, dtype=np.float32) / max(T - 1, 1)
+    span = max(T - 1, 1)
 
     for total_shift in shifts:
         # Accumulate shifted time rows
         acc = np.zeros((N_tiles, W), dtype=np.float32)
         for t in range(T):
-            s = int(round(total_shift * t_idx[t]))
+            # round(total_shift * t / span), halves rounded up, in exact integer arithmetic
+            # (drift_aligned_snr rounds the same way, so both trace the same channels)
+            s = (2 * total_shift * t + span) // (2 * span)
             row = z_tiles[t]
             if s == 0:
                 acc += row
@@ -703,6 +705,7 @@ CADENCE_PRESENT_SNR = OFF_DETECTION_SNR  # same "present" bar as the Stage 1 OFF
 CADENCE_SEARCH_BASE = 6                  # +/- channels searched around the predicted track
 CADENCE_SEARCH_MAX = 40
 CADENCE_BG_CHANS = 400                   # offsets beyond the search window used for the noise floor
+SNR_AGREEMENT_TOL = 0.1                  # cadence vs Stage 1 SNR in the scan Stage 1 scored
 CADENCE_VERDICTS = ("PASSES", "ONE-OFF", "PARTIAL", "RFI", "NOT-RECOVERED", "UNTESTED")
 
 
@@ -713,7 +716,14 @@ def cadence_search_chans(dt_s: float, track_span: float) -> int:
 
 
 def drift_aligned_snr(
-    z: np.ndarray, freqs: np.ndarray, hdr: dict, sig: dict, search_chans: int, method: str = "dedoppler"
+    z: np.ndarray,
+    freqs: np.ndarray,
+    hdr: dict,
+    sig: dict,
+    search_chans: int,
+    method: str = "dedoppler",
+    noise: str = "tile",
+    tile_width: int = 256,
 ) -> dict | None:
     """
     Measures a signal in one scan of a cadence. z is the normalize_bandpass() spectrogram
@@ -721,7 +731,14 @@ def drift_aligned_snr(
     drift_rate_hz_s. For every channel offset within +/-(search + background) of the
     predicted track, the scan is summed ALONG the drift track (de-Doppler), so a drifting
     signal keeps its full SNR. The SNR is the best offset in the search window against the
-    robust spread of the background offsets. Returns None if the track leaves the band.
+    robust spread (median, 1.4826*MAD) of the noise tracks. Returns None if the track
+    leaves the band.
+
+    noise="tile" (default) takes the noise tracks exactly as Stage 1's compute_dedoppler_snr
+    does: every track with the same drift starting in the tile that holds the predicted start
+    channel, minus |shift|+1 edge channels on each side. In the scan Stage 1 scored, both
+    SNRs then agree. noise="local" is the earlier window (offsets beyond the search window
+    out to +/-400 channels), kept for regression tests.
 
     method="timemean" reproduces the 2026-10-16 cadence_check.py measurement (a time-mean
     spectrum, +/-40 channels around the track's mid-scan position) for regression tests.
@@ -732,8 +749,12 @@ def drift_aligned_snr(
     if method == "timemean":
         t_rows = np.full(T, t_rows.mean())
         search_chans = CADENCE_SEARCH_MAX
-    f_rows = sig["peak_freq_mhz"] + sig["drift_rate_hz_s"] * t_rows / 1e6
-    c_rows = np.rint((f_rows - freqs[0]) / df_mhz).astype(np.int64)
+    # Start channel at t_ref, then the drift in channels rounded half-up like Stage 1. The 1e-3
+    # bias keeps exact halves rounding up despite the rounding of the stored drift rate;
+    # non-half values sit at least 1/(2*(T-1)) channel from a boundary.
+    c_ref = int(np.rint((sig["peak_freq_mhz"] - freqs[0]) / df_mhz))
+    drift_ch = sig["drift_rate_hz_s"] * t_rows / (df_mhz * 1e6)
+    c_rows = c_ref + np.floor(drift_ch + 0.5 + 1e-3).astype(np.int64)
 
     half = search_chans + 8 + CADENCE_BG_CHANS
     offs = np.arange(-half, half + 1)
@@ -746,13 +767,21 @@ def drift_aligned_snr(
     n_in = inside.sum(axis=0)
     dd = vals.sum(axis=0) / np.sqrt(np.maximum(n_in, 1))
 
-    bg = dd[(np.abs(offs) > search_chans + 8) & (n_in == T)]
+    if noise == "tile":
+        start = c_rows[0] + offs  # start channel of each offset's track
+        tile0 = (int(c_rows[0]) // tile_width) * tile_width
+        pad = abs(int(c_rows[-1] - c_rows[0])) + 1
+        lo, hi = (tile0 + pad, tile0 + tile_width - pad) if pad < tile_width // 2 else (tile0, tile0 + tile_width)
+        bg = dd[(start >= lo) & (start < hi) & (n_in == T)]
+    else:
+        bg = dd[(np.abs(offs) > search_chans + 8) & (n_in == T)]
+    if bg.size < 16:
+        return None
     med = float(np.median(bg))
     sigma = max(1.4826 * float(np.median(np.abs(bg - med))), 1e-6)
     k = int(np.argmax(np.where(win, dd, -np.inf)))
     # raw_snr is the white-noise value (track sum / sqrt(T)). snr uses the measured spread of
-    # nearby tracks, which on some scans (TRAPPIST-1) is 2-4x wider; Stage 1 is calibrated
-    # the same way (compute_dedoppler_snr), but over the tile's own 256 channels.
+    # nearby tracks, which on some scans (TRAPPIST-1) is 2-4x wider.
     return {"snr": (float(dd[k]) - med) / sigma, "raw_snr": float(dd[k]), "offset_ch": int(offs[k]),
             "search_chans": int(search_chans)}
 
@@ -786,7 +815,12 @@ def cadence_verdict(scans: list[dict]) -> tuple[str, str]:
 
 
 def cadence_test_signals(
-    scan_loader, roles: list[str], signals: list[dict], method: str = "dedoppler", tile_width: int = 256
+    scan_loader,
+    roles: list[str],
+    signals: list[dict],
+    method: str = "dedoppler",
+    tile_width: int = 256,
+    noise: str = "tile",
 ) -> list[dict]:
     """
     Runs drift_aligned_snr for every signal in every scan. scan_loader(i) returns the
@@ -803,10 +837,11 @@ def cadence_test_signals(
         span = track_span_s(hdr, z.shape[0])
         for j, sig in enumerate(signals):
             dt = (hdr["tstart_mjd"] - sig["t_ref_mjd"]) * 86400.0 + 0.5 * span
-            m = drift_aligned_snr(z, freqs, hdr, sig, cadence_search_chans(dt, span), method=method)
+            m = drift_aligned_snr(z, freqs, hdr, sig, cadence_search_chans(dt, span), method=method,
+                                  noise=noise, tile_width=tile_width)
             rows[j].append({
                 "scan": i, "role": role, "dt_s": round(dt, 1),
-                "snr": None if m is None else round(m["snr"], 1),
+                "snr": None if m is None else round(m["snr"], 2),
                 "raw_snr": None if m is None else round(m["raw_snr"], 1),
                 "offset_ch": None if m is None else m["offset_ch"],
                 "search_chans": None if m is None else m["search_chans"],
@@ -820,7 +855,9 @@ def cadence_test_signals(
     return out
 
 
-def run_synthetic_cadence_benchmark(method: str = "dedoppler", scans_used: int | None = None) -> dict:
+def run_synthetic_cadence_benchmark(
+    method: str = "dedoppler", scans_used: int | None = None, noise: str = "tile"
+) -> dict:
     """
     Self-test of the full-cadence check, end to end: synthesizes a 6-scan ON/OFF/ON/OFF/ON/OFF
     cadence (16 x 65,536 channels per scan), runs Stage 1 (assess_arrays) on ON_1 vs OFF_1,
@@ -834,9 +871,12 @@ def run_synthetic_cadence_benchmark(method: str = "dedoppler", scans_used: int |
                 OFF power and calls it sky-localized)             -> RFI
       tile 190  zero-drift carrier in all 6 scans; the strongest
                 OFF_1 carrier, so it is the negative control      -> RFI
-    All five ON_1 signals must be Stage 1 candidates and every verdict must match.
-    method="timemean" (the old measurement) or scans_used=2 (score the first ON/OFF pair
-    only, i.e. no cadence check) must make this benchmark FAIL.
+    All five ON_1 signals must be Stage 1 candidates and every verdict must match. In ON_1,
+    the scan Stage 1 scored, the cadence SNR of every Stage 1 candidate must equal Stage 1's
+    drift_snr within SNR_AGREEMENT_TOL.
+    method="timemean" (the old measurement), scans_used=2 (score the first ON/OFF pair
+    only, i.e. no cadence check) or noise="local" (the old +/-400-channel noise window)
+    must make this benchmark FAIL.
     """
     rng = np.random.default_rng(20261016)
     T, N, W = 16, 65536, 256
@@ -879,7 +919,7 @@ def run_synthetic_cadence_benchmark(method: str = "dedoppler", scans_used: int |
         for c in stage1["candidates"]
     ] + [stage1["negative_control"]]
     n = scans_used or len(scans)
-    tested = cadence_test_signals(lambda i: scans[i], roles[:n], signals, method=method, tile_width=W)
+    tested = cadence_test_signals(lambda i: scans[i], roles[:n], signals, method=method, tile_width=W, noise=noise)
     by_tile = {s["tile_idx"]: s for s in tested[:-1]}
     control = tested[-1]
 
@@ -899,9 +939,19 @@ def run_synthetic_cadence_benchmark(method: str = "dedoppler", scans_used: int |
             "stage1_drift_snr": got["drift_snr"] if got else None,
             "ok": bool(got) and got["cadence_verdict"] == expected,
         }
+    diffs = {s["tile_idx"]: round(s["cadence_scans"][0]["snr"] - s["drift_snr"], 2)
+             for s in tested[:-1] if s["cadence_scans"][0]["snr"] is not None}
+    max_diff = max((abs(d) for d in diffs.values()), default=float("inf"))
+    checks["on1_snr_agreement"] = {
+        "expected": f"|cadence ON_1 SNR - Stage 1 drift_snr| <= {SNR_AGREEMENT_TOL} for all {len(tested) - 1}",
+        "got": f"max {max_diff:.2f} over {len(diffs)}",
+        "diff_by_tile": diffs,
+        "ok": len(diffs) == len(tested) - 1 and max_diff <= SNR_AGREEMENT_TOL,
+    }
     return {
         "passed": all(c["ok"] for c in checks.values()),
         "method": method,
+        "noise": noise,
         "scans_used": n,
         "checks": checks,
         "stage1_candidate_tiles": [c["tile_idx"] for c in stage1["candidates"]],
