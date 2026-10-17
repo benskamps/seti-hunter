@@ -86,7 +86,7 @@ def batch_boundary(now_utc: datetime) -> datetime:
     return now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def _settled_stars(db: sqlite3.Connection) -> tuple[set[str], set[str]]:
+def settled_stars(db: sqlite3.Connection) -> tuple[set[str], set[str]]:
     """(stars with every cadence finished, stars that are also free of held signals)."""
     finished = set()
     marks = ",".join("?" * len(FINISHED))
@@ -184,7 +184,7 @@ def build_snapshot(db: sqlite3.Connection, now_utc: datetime, *, sample_names: l
         raise ValueError("now_utc must be timezone-aware")
     sample = sample_names if sample_names is not None else load_sample_names(sample_path)
     boundary = batch_boundary(now_utc)
-    finished, settled = _settled_stars(db)
+    finished, settled = settled_stars(db)
     scored = db.execute("SELECT COUNT(*) FROM cadences WHERE status='scored'").fetchone()[0]
     speeds = [r[0] for r in db.execute(
         "SELECT mb_s FROM (SELECT rowid, mb_s FROM speed_log ORDER BY utc DESC, rowid DESC LIMIT ?) "
