@@ -285,7 +285,7 @@ def generate_html_dashboard(survey_report: dict, out_html_path: str):
     n_checks = len(cad_bench["checks"])
     n_checks_ok = sum(x["ok"] for x in cad_bench["checks"].values())
     filter_buttons = "".join(
-        f'<button class="btn" onclick="filterCards(\'{v}\', this)">{VERDICT_BADGES[v][1].title()} '
+        f'<button class="btn" onclick="filterCards(\'{v}\', this)">{v} '
         f'({sum(1 for x in all_cands if x.get("cadence_verdict", "UNTESTED") == v)})</button>'
         for v in VERDICT_BADGES
         if any(x.get("cadence_verdict", "UNTESTED") == v for x in all_cands)
