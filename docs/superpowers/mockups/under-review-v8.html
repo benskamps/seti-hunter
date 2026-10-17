@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Under private review</title>
+<style>
+  :root{--bg:#0b0f19;--panel:#111827;--line:#1f2937;--ink:#e5e7eb;--dim:#94a3b8;--on:#4f8ff7;--elim:#ef4444;--pass:#10b981;--unt:#f59e0b;--gold:#ffd166}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;padding:24px 16px 60px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px} h2{font-size:17px;margin:28px 0 8px}
+  .sub0{color:var(--dim);margin:0 0 18px}
+  .wall{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;grid-auto-flow:dense}
+  .tile{margin:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .tile img{display:block;width:100%;aspect-ratio:300/232;object-fit:cover}
+  figcaption{padding:7px 9px;font-size:12px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .t{font-weight:700}.w{color:var(--gold);font-weight:700}
+  .st{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.04em;color:#fff;white-space:nowrap}
+  .sub{color:var(--dim);font-size:11px}
+
+  .review{grid-column:span 2;grid-row:span 2;margin:0;border-radius:10px;overflow:hidden;border:1px solid rgba(255,209,102,.6);
+          box-shadow:0 0 0 1px rgba(255,209,102,.25),0 0 28px rgba(255,209,102,.18);background:#05070d;display:flex;flex-direction:column}
+  .viz{position:relative;flex:1;min-height:240px}
+  .viz canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .frost{position:absolute;inset:0;backdrop-filter:blur(1.4px);-webkit-backdrop-filter:blur(1.4px);
+         background:radial-gradient(ellipse at 50% 40%,rgba(11,15,25,0) 40%,rgba(11,15,25,.55) 100%);pointer-events:none}
+  .seal{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:8px;padding:6px 11px;border-radius:999px;
+        background:rgba(11,15,25,.78);border:1px solid rgba(255,209,102,.55);color:var(--gold);font:700 11px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:pulse 2.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+  .redact{position:absolute;bottom:12px;right:14px;padding:6px 9px;border-radius:6px;background:rgba(11,15,25,.72);text-align:right;font:11px/1.7 ui-monospace,Consolas,monospace;color:var(--dim)}
+  .bar{display:inline-block;height:9px;border-radius:2px;background:#334155;vertical-align:middle}
+  .panel{background:linear-gradient(180deg,#0e1424,#111827);border-top:1px solid rgba(255,209,102,.35);padding:12px 14px}
+  .panel h3{margin:0 0 8px;font-size:14px;color:var(--gold)}
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .step{font-size:11px;color:var(--dim);display:flex;flex-direction:column;gap:5px}
+  .step .pip{height:5px;border-radius:3px;background:#1f2937}
+  .step.done{color:var(--ink)} .step.done .pip{background:var(--gold)}
+  .step.now{color:var(--ink)} .step.now .pip{background:linear-gradient(90deg,rgba(255,209,102,.2),var(--gold),rgba(255,209,102,.2));background-size:200% 100%;animation:sh 2.4s linear infinite}
+  .fine{color:var(--dim);font-size:11.5px;margin:8px 0 0}
+
+  .fun{display:grid;grid-template-columns:220px 1fr 60px;gap:8px 12px;align-items:center;font:12px ui-monospace,Consolas,monospace;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .trk{background:#0b1220;border-radius:4px;height:22px;overflow:hidden}
+  .fill{height:100%;border-radius:4px}
+  .shimmer{background:linear-gradient(90deg,rgba(255,209,102,.25),rgba(255,209,102,.95),rgba(255,209,102,.25));background-size:200% 100%;animation:sh 2.4s linear infinite}
+  @keyframes sh{from{background-position:200% 0}to{background-position:0 0}}
+  .n{text-align:right;font-weight:700}
+  @media (max-width:760px){.wall{grid-template-columns:repeat(2,1fr)}.steps{grid-template-columns:repeat(2,1fr)}.fun{grid-template-columns:130px 1fr 40px}}
+  @media (prefers-reduced-motion:reduce){.dot,.shimmer,.step.now .pip{animation:none}}
+</style></head>
+<body><div class="wrap">
+  <h1>When something passes every rung</h1>
+  <p class="sub0">It's held privately while it's checked. The public Wall pins this tile to the top: alive and clearly important, but it gives away nothing (no star, no frequency, no date) until review ends. The waterfall inside is generated art, not the real signal.</p>
+
+  <div class="wall">
+    <figure class="review" aria-label="One signal under private review">
+      <div class="viz">
+        <canvas id="cv" width="640" height="300"></canvas>
+        <div class="frost"></div>
+        <div class="seal"><span class="dot"></span>UNDER PRIVATE REVIEW</div>
+        <div class="redact">star <span class="bar" style="width:70px"></span><br>freq <span class="bar" style="width:84px"></span><br>date <span class="bar" style="width:56px"></span></div>
+      </div>
+      <div class="panel">
+        <h3>1 signal passed all five rungs &middot; day 6 of review</h3>
+        <div class="steps">
+          <div class="step done"><div class="pip"></div>Re-checked on full-resolution data</div>
+          <div class="step done"><div class="pip"></div>Second reviewer agrees it passes</div>
+          <div class="step now"><div class="pip"></div>Re-observation requested</div>
+          <div class="step"><div class="pip"></div>Public release, with everything</div>
+        </div>
+        <p class="fine">If review eliminates it, it joins the Ledger like any other signal, with the rung and the reason.</p>
+      </div>
+    </figure>
+    <figure class="tile"><img src="/files/wall_galactic_center_sgrb2_1.jpg" alt=""><figcaption><div class="row"><span class="t">Sgr B2</span><span class="w">132.6</span></div><div class="row"><span class="sub">2193.563 MHz</span><span class="st" style="background:var(--unt)">Untested</span></div></figcaption></figure>
+    <figure class="tile"><img src="/files/wall_tabbys_star_sband_1.jpg" alt=""><figcaption><div class="row"><span class="t">Tabby's Star</span><span class="w">90.6</span></div><div class="row"><span class="sub">2266.805 MHz</span><span class="st" style="background:var(--elim)">One-off</span></div></figcaption></figure>
+    <figure class="tile"><img src="/files/wall_tabbys_star_sband_2.jpg" alt=""><figcaption><div class="row"><span class="t">Tabby's Star</span><span class="w">82.9</span></div><div class="row"><span class="sub">2280.721 MHz</span><span class="st" style="background:var(--elim)">One-off</span></div></figcaption></figure>
+    <figure class="tile"><img src="/files/wall_oumuamua_interstellar_1.jpg" alt=""><figcaption><div class="row"><span class="t">'Oumuamua</span><span class="w">37.7</span></div><div class="row"><span class="sub">2433.033 MHz</span><span class="st" style="background:var(--elim)">One-off</span></div></figcaption></figure>
+    <figure class="tile"><img src="/files/wall_kepler_transit_pair_1.jpg" alt=""><figcaption><div class="row"><span class="t">Kepler-992b</span><span class="w">17.6</span></div><div class="row"><span class="sub">1617.883 MHz</span><span class="st" style="background:var(--elim)">One-off</span></div></figcaption></figure>
+    <figure class="tile"><img src="/files/wall_nearby_exoplanet_hosts_2.jpg" alt=""><figcaption><div class="row"><span class="t">Eps Eridani</span><span class="w">6.3</span></div><div class="row"><span class="sub">2195.500 MHz</span><span class="st" style="background:var(--elim)">Interference</span></div></figcaption></figure>
+  </div>
+
+  <h2>The Funnel, while it's under review</h2>
+  <div class="fun">
+    <div>&#9316; Seen around another star</div><div class="trk"><div class="fill" style="width:0"></div></div><div class="n">0</div>
+    <div><b>Under private review</b></div><div class="trk"><div class="fill shimmer" style="width:8%"></div></div><div class="n" style="color:var(--gold)">1</div>
+    <div><b>Public candidates</b></div><div class="trk"><div class="fill" style="width:0"></div></div><div class="n" style="color:var(--pass)">0</div>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'), g=cv.getContext('2d'), W=cv.width, H=cv.height;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var img=g.createImageData(W,1), t=0;
+  function col(v){v=Math.max(0,Math.min(1,v));return [255*Math.min(1,v*1.8),255*Math.min(1,Math.max(0,(v-0.4)*1.8)),255*Math.min(1,v*0.9*(1-v)+0.04)];}
+  function row(){
+    var cx=W*0.42+Math.sin(t/150)*W*0.16, breathe=0.6+0.4*Math.sin(t/23);
+    for(var x=0;x<W;x++){
+      var v=Math.random()*0.12+(Math.random()<0.002?0.3:0);
+      var d=Math.abs(x-cx); if(d<3) v+=0.8*breathe*(1-d/3);
+      var d2=Math.abs(x-(cx+34)); if(d2<2) v+=0.45*breathe*(1-d2/2);
+      var d3=Math.abs(x-(cx+68)); if(d3<2) v+=0.3*breathe*(1-d3/2);
+      var c=col(v), i=x*4; img.data[i]=c[0];img.data[i+1]=c[1];img.data[i+2]=c[2];img.data[i+3]=255;
+    }
+  }
+  for(var k=0;k<H;k++){row();g.putImageData(img,0,k);t++;}
+  if(reduce) return;
+  (function step(){g.drawImage(cv,0,1,W,H-1,0,0,W,H-1);row();g.putImageData(img,0,H-1);t++;requestAnimationFrame(step);})();
+})();
+</script>
+</body></html>
