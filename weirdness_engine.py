@@ -706,7 +706,7 @@ CADENCE_SEARCH_BASE = 6                  # +/- channels searched around the pred
 CADENCE_SEARCH_MAX = 40
 CADENCE_BG_CHANS = 400                   # offsets beyond the search window used for the noise floor
 SNR_AGREEMENT_TOL = 0.1                  # cadence vs Stage 1 SNR in the scan Stage 1 scored
-CADENCE_VERDICTS = ("PASSES", "ONE-OFF", "PARTIAL", "RFI", "NOT-RECOVERED", "UNTESTED")
+CADENCE_VERDICTS = ("PASSES", "ONE-OFF", "PARTIAL", "RFI", "INCOMPLETE", "NOT-RECOVERED", "UNTESTED")
 
 
 def cadence_search_chans(dt_s: float, track_span: float) -> int:
@@ -796,15 +796,22 @@ def cadence_verdict(scans: list[dict]) -> tuple[str, str]:
       NOT-RECOVERED - absent even from the first ON scan: the check could not see the
                       Stage 1 signal, so it says nothing about the candidate
       PARTIAL       - in some ON scans but not all
+      INCOMPLETE    - no OFF hit, but at least one scan could not be measured, so the
+                      cadence cannot be completed (never PASSES)
       UNTESTED      - the cadence has no OFF scan
     """
     on = [s["present"] for s in scans if s["role"] == "ON"]
     off = [s["present"] for s in scans if s["role"] == "OFF"]
-    detail = f"in {sum(bool(p) for p in on)}/{len(on)} ON, {sum(bool(p) for p in off)}/{len(off)} OFF"
+    detail = f"in {sum(p is True for p in on)}/{len(on)} ON, {sum(p is True for p in off)}/{len(off)} OFF"
+    n_unmeasured = sum(p is None for p in on + off)
+    if n_unmeasured:
+        detail += f", {n_unmeasured} scan(s) unmeasured"
     if not off:
         return "UNTESTED", detail + " (no OFF scan in this cadence)"
-    if any(off):
+    if any(p is True for p in off):
         return "RFI", detail
+    if n_unmeasured:
+        return "INCOMPLETE", detail
     if all(on):
         return "PASSES", detail
     if not on[0]:
