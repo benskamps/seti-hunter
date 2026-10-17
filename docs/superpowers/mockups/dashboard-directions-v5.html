@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard directions</title>
+<style>
+  :root{--bg:#0b0f19;--panel:#111827;--line:#1f2937;--ink:#e5e7eb;--dim:#94a3b8;--on:#4f8ff7;--off:#64748b;--elim:#ef4444;--pass:#10b981;--unt:#f59e0b;--gold:#ffd166}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;padding:24px 16px 60px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--dim);margin:0 0 22px}
+  .dir{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:22px;overflow:hidden;cursor:pointer;transition:box-shadow .15s}
+  .dir.selected{box-shadow:0 0 0 3px var(--gold)}
+  .dir-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .dir-head h2{margin:0;font-size:17px}
+  .dir-head .pick{font-size:12px;color:var(--dim)}
+  .dir.selected .pick{color:var(--gold)}
+  .dir-body{padding:18px}
+  .why{color:var(--dim);padding:0 18px 16px;margin:0}
+  .mono{font:12px/1.4 ui-monospace,Consolas,monospace}
+  /* funnel */
+  .fun{display:grid;grid-template-columns:200px 1fr 40px;gap:7px 12px;align-items:center}
+  .fun .lab{color:var(--dim)}
+  .fun .trk{background:#0b1220;border-radius:4px;height:22px;position:relative}
+  .fun .fill{height:100%;border-radius:4px}
+  .fun .n{text-align:right;font-weight:700}
+  .fun .lab b{color:var(--ink)}
+  .kpis{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .kpi{background:#0b1220;border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:120px}
+  .kpi .v{font-size:20px;font-weight:700}.kpi .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  /* ledger */
+  table{border-collapse:collapse;width:100%}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .strip{position:relative;height:44px;display:inline-flex;align-items:flex-end;gap:3px;padding:0 4px;border-bottom:1px solid #334155}
+  .strip .thr{position:absolute;left:0;right:0;bottom:11px;border-top:1px dashed var(--elim);opacity:.8}
+  .b{width:11px;border-radius:2px 2px 0 0}.b.on{background:var(--on)}.b.off{background:var(--off)}
+  .r{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;font-size:11px;font-weight:700;margin-right:3px;background:#1f2937;color:#475569}
+  .r.p{background:var(--pass);color:#04130d}.r.e{background:var(--elim);color:#fff}.r.u{background:var(--unt);color:#1a1205}
+  .st{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:800;letter-spacing:.05em;background:var(--elim);color:#fff}
+  .why2{color:var(--dim);font-size:12px}
+  /* wall */
+  .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+  .tile{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#05070d}
+  .tile.gold{box-shadow:0 0 0 2px var(--gold),0 0 18px rgba(255,209,102,.35)}
+  .wf{height:92px;position:relative;background:repeating-linear-gradient(0deg,#05070d 0 2px,#0d1424 2px 4px)}
+  .sk{position:absolute;width:3px;background:var(--gold);box-shadow:0 0 7px #ffb703;border-radius:2px}
+  .cap{padding:6px 8px;font-size:11px;background:var(--panel);display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .cap .t{color:var(--ink);font-weight:600}.cap .s{color:var(--dim)}
+  .foot{color:var(--dim);font-size:13px;margin-top:6px}
+  @media (max-width:640px){.fun{grid-template-columns:120px 1fr 32px}}
+  .explain{background:#0d1322;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:24px}
+  .eh{font-size:15px;margin:0 0 12px;color:var(--gold)}
+  .ex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+  .ex{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .ex-title{font-weight:700;margin-bottom:8px}
+  .ex-svg{width:100%;height:auto}
+  .ex-p{color:var(--dim);font-size:12.5px;margin:8px 0 0}
+  .fp-row{display:flex;gap:10px;justify-content:space-between}
+  .fp{text-align:center;flex:1}.fp .strip{justify-content:center}
+  .fp-l{font-weight:700;font-size:12px;margin-top:5px}.fp-s{color:var(--dim);font-size:11px}
+  .rungs{list-style:none;margin:0;padding:0;font-size:12.5px}.rungs li{display:flex;align-items:center;gap:6px;padding:3px 0}
+</style></head>
+<body><div class="wrap">
+  <h1>What should the public dashboard feel like?</h1>
+  <p class="sub">Below: how to read it, then three directions, built from today's real 6-target run: 24 signals flagged, none survived. Click any you like; you can pick more than one. The real site covers all 1,133 stars.</p>
+
+    <section class="explain">
+    <h2 class="eh">How to read everything below</h2>
+
+    <div class="ex-grid">
+      <div class="ex">
+        <div class="ex-title">1 &middot; What a cadence is</div>
+        <svg viewBox="0 0 300 92" class="ex-svg" role="img" aria-label="Six five-minute scans alternating between the star and empty sky">
+          <g font-family="ui-monospace,Consolas,monospace" font-size="10">
+            <rect x="6" y="20" width="42" height="30" rx="4" fill="#4f8ff7"/><text x="27" y="39" text-anchor="middle" fill="#04122b" font-weight="700">ON</text>
+            <rect x="54" y="20" width="42" height="30" rx="4" fill="#64748b"/><text x="75" y="39" text-anchor="middle" fill="#0b0f19" font-weight="700">OFF</text>
+            <rect x="102" y="20" width="42" height="30" rx="4" fill="#4f8ff7"/><text x="123" y="39" text-anchor="middle" fill="#04122b" font-weight="700">ON</text>
+            <rect x="150" y="20" width="42" height="30" rx="4" fill="#64748b"/><text x="171" y="39" text-anchor="middle" fill="#0b0f19" font-weight="700">OFF</text>
+            <rect x="198" y="20" width="42" height="30" rx="4" fill="#4f8ff7"/><text x="219" y="39" text-anchor="middle" fill="#04122b" font-weight="700">ON</text>
+            <rect x="246" y="20" width="42" height="30" rx="4" fill="#64748b"/><text x="267" y="39" text-anchor="middle" fill="#0b0f19" font-weight="700">OFF</text>
+            <line x1="6" y1="64" x2="288" y2="64" stroke="#334155"/>
+            <text x="6" y="80" fill="#94a3b8">0 min</text><text x="288" y="80" fill="#94a3b8" text-anchor="end">~30 min</text>
+            <text x="6" y="12" fill="#94a3b8">ON = at the star &#183; OFF = elsewhere in the sky</text>
+          </g>
+        </svg>
+        <p class="ex-p">Each 5-minute look at the star alternates with a look somewhere else. A real signal from the star should follow the telescope.</p>
+      </div>
+
+      <div class="ex">
+        <div class="ex-title">2 &middot; The three fingerprints</div>
+        <div class="fp-row">
+          <div class="fp"><div class="strip"><div class="thr"></div><div class="b on" style="height:30px"></div><div class="b off" style="height:3px"></div><div class="b on" style="height:28px"></div><div class="b off" style="height:2px"></div><div class="b on" style="height:31px"></div><div class="b off" style="height:3px"></div></div><div class="fp-l" style="color:var(--gold)">From the star</div><div class="fp-s">every ON, no OFF</div></div>
+          <div class="fp"><div class="strip"><div class="thr"></div><div class="b on" style="height:34px"></div><div class="b off" style="height:33px"></div><div class="b on" style="height:35px"></div><div class="b off" style="height:32px"></div><div class="b on" style="height:34px"></div><div class="b off" style="height:33px"></div></div><div class="fp-l">Interference</div><div class="fp-s">there wherever we point</div></div>
+          <div class="fp"><div class="strip"><div class="thr"></div><div class="b on" style="height:38px"></div><div class="b off" style="height:2px"></div><div class="b on" style="height:3px"></div><div class="b off" style="height:2px"></div><div class="b on" style="height:3px"></div><div class="b off" style="height:2px"></div></div><div class="fp-l">One-off</div><div class="fp-s">one scan, then gone</div></div>
+        </div>
+        <p class="ex-p">Bar height is signal strength in each scan. The red dashes mark the detection line. Only the first pattern counts.</p>
+      </div>
+
+      <div class="ex">
+        <div class="ex-title">3 &middot; The ladder, in order</div>
+        <ol class="rungs">
+          <li><span class="r e">1</span>Seen in any OFF scan &rarr; eliminated</li>
+          <li><span class="r e">2</span>Missing from any ON scan &rarr; eliminated</li>
+          <li><span class="r e">3</span>Doesn't drift (Earth-fixed) &rarr; eliminated</li>
+          <li><span class="r e">4</span>Inside a known interference band &rarr; eliminated</li>
+          <li><span class="r e">5</span>Also seen around another star &rarr; eliminated</li>
+          <li><span class="r p">&#10003;</span><b>Passes all five</b> &rarr; candidate</li>
+        </ol>
+        <p class="ex-p">Every flagged signal goes down the same five rungs. The dashboard records the first rung that eliminated it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="dir" data-choice="funnel" onclick="toggleSelect(this)">
+    <div class="dir-head"><h2>A &middot; The Funnel</h2><span class="pick">click to pick</span></div>
+    <div class="dir-body">
+      <div class="kpis">
+        <div class="kpi"><div class="v">6</div><div class="l">stars searched</div></div>
+        <div class="kpi"><div class="v">24</div><div class="l">signals flagged</div></div>
+        <div class="kpi"><div class="v">0</div><div class="l">candidates</div></div>
+        <div class="kpi"><div class="v">4</div><div class="l">couldn't test</div></div>
+      </div>
+      <div class="fun mono">
+        <div class="lab"><b>Flagged by the scorer</b></div><div class="trk"><div class="fill" style="width:100%;background:var(--on)"></div></div><div class="n">24</div>
+        <div class="lab">&#9312; Seen in an OFF scan</div><div class="trk"><div class="fill" style="width:16.7%;background:var(--elim)"></div></div><div class="n">4</div>
+        <div class="lab">&#9313; Missing from an ON scan</div><div class="trk"><div class="fill" style="width:66.7%;background:var(--elim)"></div></div><div class="n">16</div>
+        <div class="lab">&#9314; Zero drift (Earth-fixed)</div><div class="trk"><div class="fill" style="width:0%"></div></div><div class="n">0</div>
+        <div class="lab">&#9315; Known interference band</div><div class="trk"><div class="fill" style="width:0%"></div></div><div class="n">0</div>
+        <div class="lab">&#9316; Seen around another star</div><div class="trk"><div class="fill" style="width:0%"></div></div><div class="n">0</div>
+        <div class="lab">Couldn't test (no OFF scans)</div><div class="trk"><div class="fill" style="width:16.7%;background:var(--unt)"></div></div><div class="n">4</div>
+        <div class="lab"><b>Candidates</b></div><div class="trk"><div class="fill" style="width:0%"></div></div><div class="n" style="color:var(--pass)">0</div>
+      </div>
+      <p class="foot">Click any rung to list every signal it eliminated. Rungs &#9314;&ndash;&#9316; aren't built yet; today the first two eliminate everything.</p>
+    </div>
+    <p class="why">The front door: the whole survey in one picture. It reads like the paper's Figure 1, and the honesty is the headline.</p>
+  </section>
+
+  <section class="dir" data-choice="ledger" onclick="toggleSelect(this)">
+    <div class="dir-head"><h2>B &middot; The Ledger</h2><span class="pick">click to pick</span></div>
+    <div class="dir-body">
+      <table class="mono">
+        <tr><th>Star &middot; frequency</th><th>Six-scan fingerprint</th><th>Eliminated at</th><th>Fate</th><th>Why</th></tr>
+        <tr><td>Tabby's Star<br><span class="why2">2266.805 MHz</span></td>
+          <td><div class="strip"><div class="thr"></div><div class="b on" style="height:38px"></div><div class="b off" style="height:5px"></div><div class="b on" style="height:4px"></div><div class="b off" style="height:2px"></div><div class="b on" style="height:4px"></div><div class="b off" style="height:2px"></div></div></td>
+          <td><span class="r p">1</span><span class="r e">2</span><span class="r">3</span><span class="r">4</span><span class="r">5</span></td>
+          <td><span class="st">ONE-OFF</span></td><td class="why2">SNR 4,380 in the first ON scan, then gone</td></tr>
+        <tr><td>Epsilon Eridani<br><span class="why2">2195.500 MHz</span></td>
+          <td><div class="strip"><div class="thr"></div><div class="b on" style="height:42px"></div><div class="b off" style="height:40px"></div><div class="b on" style="height:39px"></div><div class="b off" style="height:39px"></div><div class="b on" style="height:39px"></div><div class="b off" style="height:38px"></div></div></td>
+          <td><span class="r e">1</span><span class="r">2</span><span class="r">3</span><span class="r">4</span><span class="r">5</span></td>
+          <td><span class="st">RFI</span></td><td class="why2">Loud in all 3 OFF scans</td></tr>
+        <tr><td>Kepler-992b<br><span class="why2">1617.883 MHz</span></td>
+          <td><div class="strip"><div class="thr"></div><div class="b on" style="height:12px"></div><div class="b off" style="height:3px"></div><div class="b on" style="height:4px"></div><div class="b off" style="height:2px"></div></div></td>
+          <td><span class="r p">1</span><span class="r e">2</span><span class="r">3</span><span class="r">4</span><span class="r">5</span></td>
+          <td><span class="st">ONE-OFF</span></td><td class="why2">One scan only; also sits in the Iridium satellite band</td></tr>
+        <tr><td>Sgr B2<br><span class="why2">2193.563 MHz</span></td>
+          <td><div class="strip"><div class="thr"></div><div class="b on" style="height:41px"></div><div class="b on" style="height:42px"></div></div></td>
+          <td><span class="r u">1</span><span class="r u">2</span><span class="r p">3</span><span class="r p">4</span><span class="r e">5</span></td>
+          <td><span class="st">OTHER STAR</span></td><td class="why2">Same carrier as at Tabby's Star, on another date (once &#9316; exists)</td></tr>
+      </table>
+      <p class="foot">Blue = ON scan, grey = OFF scan, red dashes = the detection line. Every row links to its spectrogram cutouts and the raw numbers.</p>
+    </div>
+    <p class="why">The audit view: one row per flagged signal, sortable and searchable, so a skeptic can check any single signal in seconds.</p>
+  </section>
+
+  <section class="dir" data-choice="wall" onclick="toggleSelect(this)">
+    <div class="dir-head"><h2>C &middot; The Weird Wall</h2><span class="pick">click to pick</span></div>
+    <div class="dir-body">
+      <div class="wall">
+        <div class="tile gold"><div class="wf" style="display:flex;align-items:center;justify-content:center;color:var(--gold);font:12px ui-monospace">nothing yet</div><div class="cap"><span class="t">Still unexplained</span><span class="st" style="background:var(--pass)">OPEN</span></div></div>
+        <div class="tile"><div class="wf"><div class="sk" style="left:34%;top:8px;height:34px;transform:rotate(14deg)"></div><div class="sk" style="left:44%;top:8px;height:34px;transform:rotate(14deg)"></div></div><div class="cap"><span class="t">Sgr B2 <span class="s">132.6</span></span><span class="st">OTHER STAR</span></div></div>
+        <div class="tile"><div class="wf"><div class="sk" style="left:55%;top:4px;height:26px;transform:rotate(-20deg)"></div></div><div class="cap"><span class="t">Tabby <span class="s">90.6</span></span><span class="st">ONE-OFF</span></div></div>
+        <div class="tile"><div class="wf"><div class="sk" style="left:38%;top:6px;height:80px;transform:rotate(-7deg)"></div><div class="sk" style="left:48%;top:6px;height:80px;transform:rotate(-7deg)"></div><div class="sk" style="left:58%;top:6px;height:80px;transform:rotate(-7deg)"></div></div><div class="cap"><span class="t">Tabby <span class="s">82.9</span></span><span class="st">ONE-OFF</span></div></div>
+        <div class="tile"><div class="wf"><div class="sk" style="left:22%;top:40px;height:18px;transform:rotate(28deg)"></div></div><div class="cap"><span class="t">'Oumuamua <span class="s">37.7</span></span><span class="st">ONE-OFF</span></div></div>
+        <div class="tile"><div class="wf"><div class="sk" style="left:62%;top:4px;height:84px"></div></div><div class="cap"><span class="t">Eps Eri <span class="s">6.3</span></span><span class="st">RFI</span></div></div>
+      </div>
+      <p class="foot">Sorted by weirdness score. Anything nothing could explain glows gold and pins to the top. Waterfalls are sketched here; the real site uses the actual cutouts.</p>
+    </div>
+    <p class="why">The "whiskers out for weird" view: the most fun to browse, and where something truly strange would show up first.</p>
+  </section>
+
+  <p class="sub" style="margin-top:8px">My guess at the best mix: the Funnel as the front door, the Wall for browsing, and the Ledger one click deep for audits.</p>
+</div></body></html>

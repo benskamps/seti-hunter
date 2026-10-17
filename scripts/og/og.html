@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>og card</title>
+<!-- Template for site/listen/og.png (1200x630). Rendered by scripts/make_og.mjs through
+     scripts/serve_listen.py, which serves this folder at /__og/. Not published. -->
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html::before, html::after, body::before { display: none; }
+  body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #1c1510; position: relative; }
+  canvas { position: absolute; inset: 0; }
+  .txt { position: absolute; left: 64px; top: 70px; width: 640px; z-index: 2; }
+  .eye { font: 500 15px/1 'JetBrains Mono', monospace; letter-spacing: .32em; text-transform: uppercase; color: #c9a86a; margin: 0 0 26px; }
+  h1 { font: italic 380 96px/.96 Fraunces, Georgia, serif; font-variation-settings: 'opsz' 144; letter-spacing: -.015em; margin: 0 0 28px; color: #ece1cc; }
+  h1 em { color: #e8833a; }
+  p { font: italic 360 26px/1.35 Fraunces, Georgia, serif; color: #b8a98c; margin: 0; max-width: 560px; }
+  .url { position: absolute; left: 64px; bottom: 54px; font: 600 17px/1 'JetBrains Mono', monospace; letter-spacing: .14em; color: #7fe0d0; z-index: 2; }
+  .rungs { position: absolute; right: 60px; bottom: 50px; display: flex; gap: 10px; z-index: 2; }
+  .rungs i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 700 15px 'JetBrains Mono', monospace; color: #160f0a; font-style: normal; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1200" height="630"></canvas>
+<div class="txt">
+  <p class="eye">seti-hunter &middot; a public survey</p>
+  <h1>Listening to <em>1,133 stars</em></h1>
+  <p>Every signal the search flags, and the reason it was eliminated.</p>
+</div>
+<div class="url">brokenbranch.dev/listen</div>
+<div class="rungs"><i style="background:#e8833a">1</i><i style="background:#d0573f">2</i><i style="background:#8fa3ad">3</i><i style="background:#cfa42c">4</i><i style="background:#a88bc9">5</i></div>
+<script src="/listen/stars.js"></script>
+<script>
+  // The real sample on a Hammer-Aitoff sky, pushed right and faded under the type.
+  const g = document.getElementById('c').getContext('2d');
+  const W = 1200, H = 630, cx = 800, cy = 300, sx = 470 / (2 * Math.SQRT2), sy = 250 / Math.SQRT2, D = Math.PI / 180;
+  const proj = (ra, dec) => { let l = (ra > 180 ? ra - 360 : ra) * D; l = -l; const b = dec * D; const z = Math.sqrt(1 + Math.cos(b) * Math.cos(l / 2)); return [cx + sx * 2 * Math.SQRT2 * Math.cos(b) * Math.sin(l / 2) / z, cy - sy * Math.SQRT2 * Math.sin(b) / z]; };
+  const bg = g.createRadialGradient(cx, cy, 20, cx, cy, 520); bg.addColorStop(0, '#13213a'); bg.addColorStop(1, 'rgba(28,21,16,0)');
+  g.fillStyle = bg; g.beginPath(); g.ellipse(cx, cy, 470, 250, 0, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(143,170,190,.28)'; g.beginPath(); g.ellipse(cx, cy, 470, 250, 0, 0, 7); g.stroke();
+  const col = { LS: '#fff3c4', L: '#7fe0d0', S: '#c4b5fd' };
+  g.globalCompositeOperation = 'lighter';
+  for (const s of window.LISTEN_STARS.stars) {
+    const [x, y] = proj(s[1], s[2]); const c = col[s[3]] || '#fff';
+    const gr = g.createRadialGradient(x, y, 0, x, y, 5); gr.addColorStop(0, c); gr.addColorStop(.35, c + '66'); gr.addColorStop(1, c + '00');
+    g.fillStyle = gr; g.fillRect(x - 5, y - 5, 10, 10);
+  }
+  g.globalCompositeOperation = 'source-over';
+  const fade = g.createLinearGradient(0, 0, 760, 0); fade.addColorStop(0, 'rgba(28,21,16,.97)'); fade.addColorStop(.62, 'rgba(28,21,16,.82)'); fade.addColorStop(1, 'rgba(28,21,16,0)');
+  g.fillStyle = fade; g.fillRect(0, 0, 760, H);
+  document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
