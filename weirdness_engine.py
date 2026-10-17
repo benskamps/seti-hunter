@@ -1197,3 +1197,4 @@ if __name__ == "__main__":
     print(json.dumps(res, indent=2))
     print(json.dumps(run_noise_calibration_benchmark(), indent=2))
     print(json.dumps(run_synthetic_cadence_benchmark(), indent=2))
+    print(json.dumps(run_cadence_edge_case_benchmark(), indent=2, default=str))
