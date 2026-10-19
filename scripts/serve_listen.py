@@ -8,6 +8,7 @@
       /__mode?m=empty      {"empty": true, "reason": "not-configured"}   (the default)
       /__mode?m=fixture    the B1 fixture database's snapshot as of now (has a pending and a survivor)
       /__mode?m=stale      the same snapshot as of three hours ago
+      /__mode?m=notstarted a valid snapshot of a run with no cadence scored (what the gist holds pre-run)
       /__mode?m=error      HTTP 502
 The fixture snapshot is built with survey.snapshot exactly as the publisher builds it.
 """
@@ -49,6 +50,13 @@ def fixture_snapshot(age: timedelta) -> bytes:
             db.close()
 
 
+def empty_run_snapshot() -> bytes:
+    db = sqlite3.connect(":memory:")
+    db.executescript(make_fixture_db.SCHEMA)
+    sample = load_sample_names(ROOT / "tests" / "fixtures" / "gbt_sample_price2020.csv")
+    return serialize(build_snapshot(db, datetime.now(timezone.utc) - timedelta(hours=4), sample_names=sample))
+
+
 class Handler(BaseHTTPRequestHandler):
     site: Path = Path(".")
 
@@ -73,6 +81,8 @@ class Handler(BaseHTTPRequestHandler):
             m = STATE["mode"]
             if m == "fixture":
                 return self.send(200, fixture_snapshot(timedelta(0)))
+            if m == "notstarted":
+                return self.send(200, empty_run_snapshot())
             if m == "stale":
                 return self.send(200, fixture_snapshot(timedelta(hours=3)))
             if m == "error":

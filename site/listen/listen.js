@@ -137,11 +137,14 @@
         let reason = null;
         try {
             const s = await getJSON('/api/listen');
-            if (validSnap(s)) { store.set(LS_KEY, JSON.stringify(s)); return { snap: s, source: 'live', reason: null }; }
-            reason = (s && s.reason) || 'bad-shape';
+            if (validSnap(s) && s.mode === 'MEASURED') { store.set(LS_KEY, JSON.stringify(s)); return { snap: s, source: 'live', reason: null }; }
+            // A valid snapshot of a run with no cadence scored yet has nothing to show but
+            // zeros: the run hasn't started, so the page shows the pilot demo instead (and
+            // never keeps it as a "last good" reading).
+            reason = validSnap(s) ? 'not-started' : (s && s.reason) || 'bad-shape';
         } catch (e) { reason = 'unreachable'; }
-        const cached = parseJSON(store.get(LS_KEY));
-        if (validSnap(cached)) return { snap: cached, source: 'cached', reason };
+        const cached = reason === 'not-started' ? null : parseJSON(store.get(LS_KEY));
+        if (validSnap(cached) && cached.mode === 'MEASURED') return { snap: cached, source: 'cached', reason };
         try {
             const d = await getJSON('demo-snapshot.json');
             if (validSnap(d)) return { snap: d, source: 'demo', reason };
@@ -175,14 +178,16 @@
     }
 
     // One star's whole list, loaded when someone types its full name into "find a star".
-    async function loadShard(star) {
+    async function loadShard(star, quiet) {
         const entry = state.ledger[star];
         if (!entry || entry.loaded) return;
         entry.loaded = true;
         try {
             const arr = await getJSON(`${state.base}${entry.file}`);
             if (!Array.isArray(arr)) return;
-            state.figures = state.figures.concat(arr.filter(validItem).map((it) => ({ ...it, base: state.base })));
+            const have = new Set(state.figures.map((it) => it.id));
+            state.figures = state.figures.concat(arr.filter((it) => validItem(it) && !have.has(it.id)).map((it) => ({ ...it, base: state.base })));
+            if (quiet) return;
             state.items = mergeItems(state.figures, state.snap);
             renderChips(); renderWall(); renderSpectrum();
         } catch (e) { entry.loaded = false; }
@@ -193,12 +198,31 @@
     function mergeItems(figures, snap) {
         const byId = new Map();
         for (const it of figures) byId.set(it.id, it);
-        for (const r of (snap && Array.isArray(snap.recent_eliminated) ? snap.recent_eliminated : [])) {
+        // The demo's figures and Ledger files are its whole record; only a live run has
+        // eliminations newer than its last daily export.
+        const recent = state.source === 'demo' ? [] : (snap && Array.isArray(snap.recent_eliminated) ? snap.recent_eliminated : []);
+        for (const r of recent) {
             if (!validItem(r) || byId.has(r.id)) continue;
             byId.set(r.id, { ...r, figure: null, tile: null, scans: null, base: '' });
         }
-        return Array.from(byId.values()).sort((a, b) => (num(b.weirdness) ?? -Infinity) - (num(a.weirdness) ?? -Infinity)
-            || String(a.id).localeCompare(String(b.id)));
+        // Cutouts first, ranked by weirdness then SNR (most committed-shape flags carry no
+        // weirdness; only the weird channel does), then the rest the same way.
+        const key = (it) => [it.tile ? 0 : 1, -(num(it.weirdness) ?? -Infinity), -(num(it.snr) ?? -Infinity)];
+        return Array.from(byId.values()).sort((a, b) => {
+            const ka = key(a), kb = key(b);
+            for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+            return String(a.id).localeCompare(String(b.id));
+        });
+    }
+
+    // When every public Ledger list together is small (the pilot's 2,670), load them all up
+    // front so the ribbon, the chips and "find a star" see the whole record.
+    const SHARDS_UP_FRONT = 5000;
+    async function loadAllShards() {
+        const total = Object.values(state.ledger).reduce((n, v) => n + v.count, 0);
+        if (!total || total > SHARDS_UP_FRONT) return;
+        await Promise.all(Object.keys(state.ledger).map((star) => loadShard(star, true)));
+        state.items = mergeItems(state.figures, state.snap);
     }
 
     // Sample indices of the stars with published eliminations. Only public lists light
@@ -216,9 +240,9 @@
         const s = state.snap;
         if (!s) return { mode: 'demo', status: 'demo', text: 'No numbers yet: the survey hasn’t published, and the demo didn’t load' };
         if (state.source === 'demo') {
-            const why = state.reason === 'not-configured' ? 'DEMO DATA: THE RUN HASN’T STARTED' : 'LIVE NUMBERS UNREACHABLE RIGHT NOW';
+            const why = notStarted() ? 'DEMO DATA: THE RUN HASN’T STARTED' : 'LIVE NUMBERS UNREACHABLE RIGHT NOW';
             return { mode: 'demo', status: 'demo',
-                text: `${why} · REAL SIGNALS FROM THE ${fmt(s.progress.cadences_total)}-TARGET PILOT, NOT THE SURVEY` };
+                text: `${why} · THE ${fmt(s.progress.cadences_total)}-TARGET PILOT ON A PRE-FREEZE LADDER, NOT SURVEY RESULTS` };
         }
         const t = Date.parse(s.as_of_utc);
         const age = Date.now() - t;
@@ -230,6 +254,8 @@
         return { mode: 'measured', status: 'live', text: `MEASURED · AS OF ${utcStamp(s.as_of_utc).toUpperCase()}` };
     }
 
+    function notStarted() { return state.reason === 'not-configured' || state.reason === 'not-started'; }
+
     function setBadge(node, mode, text) { if (!node) return; node.dataset.mode = mode; node.textContent = text; }
 
     function renderBadges() {
@@ -239,11 +265,11 @@
         status.dataset.state = m.status;
         $('[data-slot="status-text"]').textContent = m.status === 'live' ? `live · as of ${utcStamp(state.snap.as_of_utc)}`
             : m.status === 'stale' ? `stale · showing the last good numbers`
-                : state.reason === 'not-configured' ? 'demo · the run hasn’t started' : 'demo · live numbers unreachable';
+                : notStarted() ? 'demo · the run hasn’t started' : 'demo · live numbers unreachable';
         const s = state.snap;
         const withFig = state.items.filter((it) => it.tile).length;
         setBadge($('[data-slot="badge-wall"]'), m.mode, state.source === 'demo'
-            ? `DEMO · REAL CUTOUTS FROM THE PILOT (${fmt(s && s.progress.cadences_total)} TARGETS) · THE SURVEY’S OWN APPEAR DAILY ONCE IT RUNS`
+            ? `DEMO · REAL CUTOUTS FROM THE ${fmt(s && s.progress.cadences_total)}-TARGET PILOT ON A PRE-FREEZE LADDER, NOT SURVEY RESULTS · ${fmt(state.items.length)} ELIMINATIONS, ${fmt(withFig)} WITH CUTOUTS`
             : `${m.mode === 'stale' ? 'STALE' : 'MEASURED'} · ${fmt(state.items.length)} ELIMINATIONS LISTED · ${fmt(withFig)} WITH CUTOUTS FROM THE DAILY EXPORT`);
         setBadge($('[data-slot="badge-heart"]'), m.mode, state.source === 'demo'
             ? 'DEMO · PILOT TOTALS · SPEEDS REPRESENTATIVE, FROM THE MEASURED 1.2–1.4 MB/S RANGE'
@@ -695,7 +721,7 @@
             onclick: () => openLedger(idx) },
         el('span', { class: 'wf' }, fig), stamp(it.rung),
         el('span', { class: 'cap' },
-            el('span', { class: 'row' }, el('span', { class: 't', text: it.star }), el('span', { class: 'w', text: num(it.weirdness) !== null ? it.weirdness.toFixed(1) : '' })),
+            el('span', { class: 'row' }, el('span', { class: 't', text: it.star }), el('span', { class: 'w', text: num(it.weirdness) !== null ? it.weirdness.toFixed(1) : num(it.snr) !== null ? `SNR ${it.snr >= 100 ? fmt(Math.round(it.snr)) : it.snr.toFixed(1)}` : '' })),
             el('span', { class: 'row' }, el('span', { class: 'mhz', text: num(it.peak_freq_mhz) !== null ? `${it.peak_freq_mhz.toFixed(3)} MHz` : '' }), el('span', { class: 'mhz', text: it.band ? `${it.band}-band` : '' })),
             el('span', { class: 'why', text: it.reason || `eliminated at rung ${it.rung}: ${RUNGS[it.rung].label}` })));
     }
@@ -923,7 +949,7 @@
         const changedSource = got.source !== state.source;
         state.snap = got.snap; state.source = got.source; state.reason = got.reason; state.loadedAt = Date.now();
         state.base = got.source === 'demo' ? 'demo/' : '';
-        if (first || changedSource) { state.figures = await loadFigures(got.source); state.ledger = await loadLedgerIndex(got.source); }
+        if (first || changedSource) { state.figures = await loadFigures(got.source); state.ledger = await loadLedgerIndex(got.source); await loadAllShards(); }
         state.items = mergeItems(state.figures, state.snap);
         state.published = publishedStars();
         renderAll();

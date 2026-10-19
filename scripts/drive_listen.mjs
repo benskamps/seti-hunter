@@ -21,15 +21,28 @@
 //                   standing in for a missing number
 //   console         no errors in any non-error mode
 import { createRequire } from 'node:module';
-import { mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const arg = (name, dflt) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : dflt; };
+// The survivors' forbidden strings are read at run time from the PRIVATE pilot file (--pilot or
+// LISTEN_PILOT) by scripts/survivor_strings.py; they are never written into this public repo. No
+// pilot file, or no survivor in it, and the survivor check fails: it cannot see what it guards.
+function survivorStrings() {
+  const py = process.env.PYTHON || 'python';
+  const pilot = arg('pilot', process.env.LISTEN_PILOT || '');
+  const r = spawnSync(py, [new URL('./survivor_strings.py', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), ...(pilot ? ['--pilot', pilot] : [])], { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.split(/\r?\n/).filter(Boolean) : null;
+}
 const SITE = resolve(arg('site', '../brokenbranchdevwebsite'));
 const BASE = arg('base', 'http://127.0.0.1:8767');
 const OUT = resolve(arg('out', 'shots'));
 mkdirSync(OUT, { recursive: true });
 const { chromium } = createRequire(`${SITE}/package.json`)('playwright');
+// The demo's numbers come from site/listen/demo-snapshot.json (rebuilt by make_demo.py), never typed here.
+const DEMO = JSON.parse(readFileSync(new URL('../site/listen/demo-snapshot.json', import.meta.url), 'utf8'));
+const DEMO_FLAGGED = new Intl.NumberFormat('en-US').format(DEMO.funnel.flagged);
 
 const PENDING = ['HIP4436', '2017.418', 'HIP4436_S_57803.9344_weird_t0412'];
 const SURVIVOR = ['HIP17147', '1388.264', 'HIP17147_L_57523.8029_chirp_t0088'];
@@ -136,7 +149,7 @@ try {
     const { ctx, page, errors } = await open(browser, { width: 1440 });
     const badge = await page.locator('[data-slot="badge"]').first().textContent();
     const flagged = await page.locator('[data-count="flagged"]').textContent();
-    check('empty gist + nothing cached -> DEMO badge, demo numbers', /^DEMO DATA: THE RUN HASN.T STARTED/.test(badge) && flagged === '24', { badge, flagged });
+    check('empty gist + nothing cached -> DEMO badge, demo numbers', /^DEMO DATA: THE RUN HASN.T STARTED/.test(badge) && flagged === DEMO_FLAGGED, { badge, flagged, expected: DEMO_FLAGGED });
     check('console clean (demo)', errors.length === 0, errors);
     await page.screenshot({ path: `${OUT}/listen-demo-1440.png`, fullPage: true });
     await ctx.close();
@@ -150,7 +163,33 @@ try {
     await page.goto(`${BASE}/listen/#signal=%E0%A4%A`, { waitUntil: 'load' });
     await sleep(1500);
     const flagged = await page.locator('[data-count="flagged"]').textContent();
-    check('malformed #signal= link: no exception, page renders', errors.length === 0 && flagged === '24', { errors, flagged });
+    check('malformed #signal= link: no exception, page renders', errors.length === 0 && flagged === DEMO_FLAGGED, { errors, flagged });
+    await ctx.close();
+  }
+  await mode('notstarted');
+  {
+    // the live gist before the run: a valid snapshot with nothing scored is "not started" -> the demo
+    const { ctx, page, errors } = await open(browser, { width: 1440 });
+    const badge = await page.locator('[data-slot="badge"]').first().textContent();
+    const flagged = await page.locator('[data-count="flagged"]').textContent();
+    const sum = await page.locator('[data-slot="funnel-sum"]').textContent();
+    check('not-started gist -> DEMO badge (pilot, pre-freeze ladder), demo numbers, rows add up',
+      /^DEMO DATA: THE RUN HASN.T STARTED .* PRE-FREEZE LADDER, NOT SURVEY RESULTS/.test(badge) && flagged === DEMO_FLAGGED && /add up/.test(sum),
+      { badge, flagged, sum });
+    // the pilot's survivor: only "1 under private review" on the redacted tile, nothing else
+    const html = await page.content();
+    const text = await page.evaluate(() => document.body.innerText);
+    const forbidden = survivorStrings();
+    const survivorLeaks = forbidden ? forbidden.filter((n) => html.includes(n) || text.includes(n)) : ['(no private pilot file: set LISTEN_PILOT)'];
+    const review = await page.locator('.review').count();
+    const underReview = await page.locator('[data-count="under_review"]').textContent();
+    check('pilot survivor: review tile + count only, no id or frequency in the page', !!forbidden && forbidden.length > 0 && survivorLeaks.length === 0 && review === 1 && underReview === String(DEMO.funnel.under_review),
+      { strings_checked: forbidden ? forbidden.length : 0, leaks: survivorLeaks.length, review, underReview });
+    const kepler = await page.evaluate(() => JSON.parse(window.render_state_to_text()).items);
+    check('the whole pilot Ledger is loaded up front', kepler >= DEMO.funnel.flagged - DEMO.funnel.untested - DEMO.funnel.not_recovered - DEMO.funnel.incomplete - DEMO.funnel.under_review - 5,
+      { items: kepler });
+    check('console clean (not started)', errors.length === 0, errors);
+    await page.screenshot({ path: `${OUT}/listen-pilot-1440.png`, fullPage: true });
     await ctx.close();
   }
   await mode('error');

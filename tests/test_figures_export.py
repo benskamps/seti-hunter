@@ -82,7 +82,7 @@ def test_items_carry_whitelisted_fields(env):
     run(db, out)
     it = json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))[0]
     assert set(it) == {"id", "star", "band", "shape", "peak_freq_mhz", "drift_rate_hz_s", "rung", "reason",
-                       "weirdness", "scans", "decided_utc", "figure", "tile"}
+                       "weirdness", "snr", "scans", "decided_utc", "figure", "tile"}
     assert it["figure"] == f"figures/{it['id']}.webp" and it["tile"] == f"figures/{it['id']}_on.webp"
     assert len(it["scans"]) == 6 and set(it["scans"][0]) == {"role", "snr", "present"}
     assert "seti_staging" not in json.dumps(it) and "src" not in it["figure"]
@@ -93,9 +93,11 @@ def test_missing_source_listed_without_figure(env):
     db.execute("UPDATE signals SET figure=NULL WHERE id='GJ411_L_57542.9764_chirp_t0002'")
     db.commit()
     counts = run(db, out)
-    items = {it["id"]: it for it in json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))}
-    assert items["GJ411_L_57542.9764_chirp_t0002"]["figure"] is None
-    assert items["GJ411_L_57542.9764_chirp_t0002"]["tile"] is None
+    wall = {it["id"] for it in json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))}
+    assert "GJ411_L_57542.9764_chirp_t0002" not in wall  # the Wall is cutouts
+    shard = {it["id"]: it for it in json.loads((out.parent / "ledger" / "GJ411.json").read_text(encoding="utf-8"))}
+    assert shard["GJ411_L_57542.9764_chirp_t0002"]["figure"] is None
+    assert shard["GJ411_L_57542.9764_chirp_t0002"]["tile"] is None
     assert counts["missing"] == 1
 
 
@@ -192,3 +194,49 @@ def test_a_withdrawn_star_loses_its_shard(env):
     run(db, out)
     assert not (out.parent / "ledger" / "GJ411.json").exists()
     assert json.loads((out.parent / "ledger" / "index.json").read_text(encoding="utf-8")) == {}
+
+
+def test_no_image_is_published_near_a_held_signal(env, tmp_path):
+    """A cutout spans ~0.73 MHz: a neighbour's waterfall could show a survivor, axes labelled.
+
+    After the run ends the survivor's star is listed (spec §9), so an eliminated
+    signal of the same cadence within GUARD_MHZ of it keeps its Ledger row but
+    gets no image.
+    """
+    from survey.figures_export import GUARD_MHZ
+    db, out = env
+    db.execute("UPDATE cadences SET status='scored' WHERE status='queued'")
+    db.execute("UPDATE signals SET verdict='ELIMINATED', rung=5 WHERE id=?", (fx.PENDING_ID,))
+    near = "HIP17147_L_57523.8029_comb_t0089"
+    p = tmp_path / "src" / f"{near}.png"
+    write_source_figure(p, 77)
+    fx.add_signal(db, near, "HIP17147_L_57523.8029", fx.STAR_SURVIVOR, "L", "comb",
+                  fx.SURVIVOR_FREQ + GUARD_MHZ / 2, 1.0, "ELIMINATED", 2, fx.REASONS[2], weirdness=50.0)
+    db.execute("UPDATE signals SET figure=? WHERE id=?", (str(p), near))
+    db.commit()
+    run(db, out)
+    assert not (out / f"{near}.webp").exists() and not (out / f"{near}_on.webp").exists()
+    wall = {it["id"] for it in json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))}
+    assert near not in wall
+    shard = json.loads((out.parent / "ledger" / "HIP17147.json").read_text(encoding="utf-8"))
+    row = next(it for it in shard if it["id"] == near)
+    assert row["figure"] is None and row["tile"] is None
+
+
+def test_the_wall_is_signals_with_cutouts_ranked_by_weirdness_then_snr(env, tmp_path):
+    """Most committed-shape flags carry no weirdness (only the weird channel does): rank by SNR next."""
+    db, out = env
+    db.execute("UPDATE signals SET weirdness=NULL, figure=NULL WHERE star=?", (fx.STAR_PUBLIC,))
+    for i, (w, snr) in enumerate([(None, 40.0), (None, 90.0), (3.0, 10.0)]):
+        sid = f"GJ411_S_57543.0102_comb_t{3000 + i:04d}"
+        p = tmp_path / "src" / f"{sid}.png"
+        write_source_figure(p, 900 + i)
+        fx.add_signal(db, sid, "GJ411_S_57543.0102", fx.STAR_PUBLIC, "S", "comb", 2300.0 + i, 1.0,
+                      "ELIMINATED", 1, fx.REASONS[1], weirdness=w)
+        db.execute("UPDATE signals SET figure=?, snr=? WHERE id=?", (str(p), snr, sid))
+    db.commit()
+    export(db, out_dir=str(out), now_utc=NOW, max_figures=2)
+    wall = json.loads((out.parent / "figures.json").read_text(encoding="utf-8"))
+    assert {it["id"] for it in wall} == {"GJ411_S_57543.0102_comb_t3002", "GJ411_S_57543.0102_comb_t3001"}
+    assert all(it["tile"] for it in wall)  # the Wall is cutouts; figure-less rows live in the shards
+    assert {it["snr"] for it in wall} == {10.0, 90.0}

@@ -44,6 +44,9 @@ DEFAULT_SRC = Path(r"E:\seti_staging\results\figures")
 DEFAULT_DB = Path(r"E:\seti_staging\state\survey.sqlite")
 
 MAX_FIGURES = 400  # Wall entries with images: ~26 MB of webp at the cap
+# A figure's ON cutout spans ~0.73 MHz. No image is published for a signal within this many MHz
+# of a pending or survivor signal of the same cadence: the neighbour's waterfall could show it.
+GUARD_MHZ = 2.0
 QUALITIES = (82, 70, 58, 46, 34, 22, 12)
 FULL_SCALES = (1.0, 0.85, 0.7, 0.55, 0.4)
 OURS = re.compile(r"^(?P<id>.+?)(?P<on>_on)?\.webp$")
@@ -121,32 +124,46 @@ def export(db: sqlite3.Connection, out_dir="site/listen/figures", now_utc: datet
     if listed:
         marks = ",".join("?" * len(listed))
         rows = db.execute(
-            "SELECT id, star, band, shape, peak_freq_mhz, drift_rate_hz_s, rung, reason, weirdness, scans_json, "
-            f"decided_utc, figure FROM signals WHERE verdict='ELIMINATED' AND COALESCE(planted,0)=0 "
+            "SELECT id, star, band, shape, peak_freq_mhz, drift_rate_hz_s, rung, reason, weirdness, snr, scans_json, "
+            f"decided_utc, figure, cadence_id FROM signals WHERE verdict='ELIMINATED' AND COALESCE(planted,0)=0 "
             f"AND star IN ({marks})", sorted(listed)).fetchall()
+    # Held signals (pending or under review): no image may be published near one (see GUARD_MHZ).
+    held = db.execute("SELECT cadence_id, peak_freq_mhz FROM signals WHERE COALESCE(planted,0)=0 "
+                      "AND verdict IN ('PENDING_R5','SURVIVOR') AND peak_freq_mhz IS NOT NULL").fetchall()
 
-    items, sources = [], {}
-    for (sid, star, band, shape, f, drift, rung, reason, weird, scans_json, decided, fig_col) in rows:
+    def near_held(cadence_id, f) -> bool:
+        return f is not None and any(c == cadence_id and abs(float(f) - hf) <= GUARD_MHZ for c, hf in held)
+
+    items, sources, guarded = [], {}, set()
+    for (sid, star, band, shape, f, drift, rung, reason, weird, snr, scans_json, decided, fig_col, cad) in rows:
         items.append({
             "id": sid, "star": star, "band": band, "shape": shape,
             "peak_freq_mhz": None if f is None else round(float(f), 6),
             "drift_rate_hz_s": None if drift is None else round(float(drift), 3),
             "rung": int(rung), "reason": reason,
             "weirdness": None if weird is None else round(float(weird), 3),
+            "snr": None if snr is None else round(float(snr), 2),
             "scans": _scans(scans_json), "decided_utc": decided,
             "figure": None, "tile": None,
         })
-        sources[sid] = fig_col
+        sources[sid] = _source(fig_col, sid, src_dir)
+        if near_held(cad, f):
+            guarded.add(sid)
 
-    # The Wall: the weirdest `max_figures`, ties broken by id so the cut is deterministic.
-    wall = sorted(items, key=lambda it: (-(it["weirdness"] if it["weirdness"] is not None else float("-inf")), it["id"]))[:max_figures]
-    keep, missing, written = set(), 0, 0
+    # The Wall is cutouts: of the listed signals that have a figure (and aren't near a held
+    # signal), the `max_figures` weirdest; most committed-shape flags carry no weirdness (only
+    # the weird channel does), so SNR ranks next. Ties break by id: the cut is deterministic.
+    def rank(it):
+        w, s = it["weirdness"], it["snr"]
+        return (w is None, -(w or 0.0), s is None, -(s or 0.0), it["id"])
+
+    candidates = [it for it in items if sources[it["id"]] is not None and it["id"] not in guarded]
+    missing = sum(1 for it in items if sources[it["id"]] is None)
+    wall = sorted(candidates, key=rank)[:max_figures]
+    keep, written = set(), 0
     for item in wall:
         sid = item["id"]
-        src = _source(sources[sid], sid, src_dir)
-        if src is None:
-            missing += 1
-            continue
+        src = sources[sid]
         full_p, tile_p = out / f"{sid}.webp", out / f"{sid}_on.webp"
         stale = not (full_p.exists() and tile_p.exists()) or min(
             full_p.stat().st_mtime, tile_p.stat().st_mtime) < src.stat().st_mtime
