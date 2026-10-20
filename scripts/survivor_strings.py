@@ -20,9 +20,11 @@ FREQ_TOL_MHZ = 0.006  # rung 5's tolerance, as pilot_regression.py matches pinne
 
 
 def pilot_path(explicit: str | None = None) -> Path | None:
-    """LISTEN_PILOT (or an explicit path), else data/pilot_expected.json, else Plan A's worktree copy."""
-    for cand in (explicit, os.environ.get("LISTEN_PILOT"), ROOT / "data" / "pilot_expected.json",
-                 ROOT.parent / "seti-hunter-plan-a" / "data" / "pilot_expected.json"):
+    """LISTEN_PILOT (or an explicit path), else the gitignored private sidecar data/private/pilot_survivors.json,
+    else data/pilot_expected.json. Since Plan A's ruling R50 the survivors' identity lives only in that sidecar;
+    a public pilot_expected.json holds opaque ids, so it yields no strings and the guard fails closed."""
+    for cand in (explicit, os.environ.get("LISTEN_PILOT"), ROOT / "data" / "private" / "pilot_survivors.json",
+                 ROOT / "data" / "pilot_expected.json"):
         if cand and Path(cand).is_file():
             return Path(cand)
     return None
@@ -42,6 +44,8 @@ def forbidden_strings(path: Path) -> set[str]:
     pilot = json.loads(Path(path).read_text(encoding="utf-8"))
     signals = pilot.get("signals", [])
     survivors = [s for s in signals if s.get("verdict") == "SURVIVOR"]
+    for h in pilot.get("held", []):           # the private sidecar (Plan A R50): {"held": [{"signal", "pinned"}]}
+        survivors += [x for x in (h.get("signal"), h.get("pinned")) if x and x.get("peak_freq_mhz") is not None]
     for p in pilot.get("pinned_survivors", []):
         match = [s for s in signals if s.get("cadence") == p.get("cadence") and s.get("shape") == p.get("shape")
                  and abs(float(s.get("peak_freq_mhz", 0)) - float(p["peak_freq_mhz"])) <= FREQ_TOL_MHZ]

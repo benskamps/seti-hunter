@@ -7,3 +7,6 @@ dashboard.html
 
 # drive_listen.mjs screenshots (default --out)
 shots/
+
+# private survivor identity (Plan A ruling R50): never committed
+data/private/
