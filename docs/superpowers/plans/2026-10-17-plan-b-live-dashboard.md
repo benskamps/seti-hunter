@@ -210,11 +210,11 @@
 
 ### Task B7: Go live with the run
 
-- [ ] **Step 1: Ask Ben, then:**
+- [x] **Step 1: Ask Ben, then:** (done 2026-10-17: gist, GIST_RAW, public repo, PR #277 merged)
   - create the public gist (`gh gist create --public snapshot.json`) and save its id to `E:\seti_staging\state\gist_id.txt`
   - fill `GIST_RAW` in `api/listen.js`
   - push seti-hunter publicly
   - merge the `listen-wing` PR
 - [ ] **Step 2:** Register `scripts/daily_export.ps1` in Task Scheduler (daily, 06:00 local).
-- [ ] **Step 3:** Retire the old surface. Delete `generate_html_dashboard`, `scan_cell_html` and `VERDICT_BADGES` from `run_survey.py`, plus the root `dashboard.html` and its `.gitignore` line. Run the existing benchmarks to confirm nothing else used them.
+- [x] **Step 3:** Retire the old surface (done 2026-10-21, 04e7362). Delete `generate_html_dashboard`, `scan_cell_html` and `VERDICT_BADGES` from `run_survey.py`, plus the root `dashboard.html` and its `.gitignore` line. Run the existing benchmarks to confirm nothing else used them.
 - [ ] **Step 4:** After the first publish, check production: `curl https://www.brokenbranch.dev/api/listen` returns schema 1 with `mode:"MEASURED"`, and `/listen/` renders with the MEASURED badge. Drive the page once more in the browser at 375 px. Record the check in a seal.
